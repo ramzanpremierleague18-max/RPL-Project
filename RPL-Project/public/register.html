@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>RPL — Register</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bgA: #04121a;
+    --glass: rgba(255,255,255,0.04);
+    --muted: #b9c9cc;
+    --accent1: #00d3b8; /* teal */
+    --accent2: #ffd05a; /* gold */
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Montserrat,system-ui,Segoe UI,Roboto;background:
+    radial-gradient(800px 400px at 10% 10%, rgba(0,211,184,0.06), transparent),
+    linear-gradient(180deg,#03121a,var(--bgA)); color:#35afaf}
+  .stage{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px;position:relative;overflow:hidden}
+  /* floating shapes */
+  .shape {position:absolute;filter:blur(28px);opacity:0.14}
+  .shape.s1{width:460px;height:420px;background:linear-gradient(135deg,var(--accent1),var(--accent2));left:-120px;top:-80px;border-radius:34px;transform:rotate(12deg)}
+  .shape.s2{width:320px;height:320px;background:linear-gradient(135deg,rgba(255,208,90,0.12),rgba(0,211,184,0.06));right:-80px;bottom:-60px;border-radius:24px;transform:rotate(-12deg)}
+  .card{position:relative;z-index:2;width:100%;max-width:980px;border-radius:16px;padding:28px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));backdrop-filter: blur(6px);box-shadow:0 30px 90px rgba(2,7,12,0.7);border:1px solid var(--glass);overflow:hidden}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .logo{width:64px;height:64px;background:linear-gradient(135deg,var(--accent1),var(--accent2));border-radius:14px;color:#04121a;font-weight:900;display:grid;place-items:center;font-size:20px;box-shadow:0 14px 40px rgba(0,0,0,0.45)}
+  h1{margin:0;font-size:20px}
+  .lead{color:var(--muted);font-size:13px}
+  form{display:grid;gap:12px;margin-top:18px}
+  label{font-weight:700;color:var(--muted);font-size:13px}
+  input,select{width:100%;padding:12px;border-radius:10px;border:0;background:transparent;color:inherit;font-weight:700;outline:none;box-shadow: inset 0 -8px 30px rgba(0,0,0,0.35);}
+  input:focus,select:focus{transform:translateY(-3px);box-shadow:0 10px 30px rgba(0,211,184,0.06), inset 0 -10px 40px rgba(0,0,0,0.45)}
+  .row{display:flex;gap:12px}
+  .btn{background:linear-gradient(90deg,var(--accent1),var(--accent2));color:#04121a;padding:12px 16px;border-radius:12px;border:0;font-weight:900;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,0.5)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+  .muted{color:var(--muted);font-size:13px}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  footer{margin-top:12px;color:var(--muted);font-size:13px}
+
+  /* micro interactions */
+  .btn:active{transform:translateY(1px) scale(.997)}
+  input::-webkit-autofill{filter:brightness(.95)}
+  @media(max-width:880px){ .row{flex-direction:column} .card{padding:18px} .logo{width:48px;height:48px} }
+</style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <div class="shape s1" aria-hidden="true"></div>
+    <div class="shape s2" aria-hidden="true"></div>
+
+    <div class="card" role="main" aria-labelledby="heading">
+      <header>
+        <div class="brand">
+          <div class="logo">RPL</div>
+          <div>
+            <h1 id="heading">RPL — Player Registration</h1>
+            <div class="lead">Fast • Secure • Premium experience</div>
+          </div>
+        </div>
+        <div>
+          <button id="admin" class="btn ghost" title="Admin">Admin</button>
+        </div>
+      </header>
+
+      <form id="regForm" autocomplete="off" onsubmit="return false;">
+        <label>Full name *</label>
+        <input id="playerName" placeholder="Full name" required>
+
+        <div class="row">
+          <div>
+            <label>Mobile number *</label>
+            <input id="playerMobile" placeholder="10 digit mobile" required>
+          </div>
+          <div>
+            <label>Email *</label>
+            <input id="playerEmail" type="email" placeholder="you@example.com" required>
+          </div>
+        </div>
+
+        <label>Role *</label>
+        <select id="playerRole" required>
+          <option value="">— choose role —</option>
+          <option value="batsman">Batsman</option>
+          <option value="bowler">Bowler</option>
+          <option value="all-rounder">All-rounder</option>
+        </select>
+
+        <div style="display:flex;gap:10px;margin-top:6px">
+          <button id="nextBtn" class="btn">Next → Payment</button>
+          <a class="btn ghost" href="index.html">Cancel</a>
+        </div>
+
+        <div class="hint">Tip: You’ll be taken to a dedicated payment page with a large scannable QR code.</div>
+      </form>
+
+      <footer>Designed & developed by Noor Ali • High-quality UX</footer>
+    </div>
+  </div>
+
+<script>
+  // keep behavior simple: store details and redirect to payment.html
+  const nextBtn = document.getElementById('nextBtn');
+  nextBtn.addEventListener('click', () => {
+    const name = document.getElementById('playerName').value.trim();
+    const mobile = document.getElementById('playerMobile').value.trim();
+    const email = document.getElementById('playerEmail').value.trim();
+    const role = document.getElementById('playerRole').value;
+    if(!name || !mobile || !email || !role){
+      alert('Please fill name, mobile, email and role');
+      return;
+    }
+    // save to localStorage for payment page
+    localStorage.setItem('rpl_name', name);
+    localStorage.setItem('rpl_mobile', mobile);
+    localStorage.setItem('rpl_email', email);
+    localStorage.setItem('rpl_role', role);
+
+    // small flash animation when clicking
+    nextBtn.disabled = true;
+    nextBtn.style.transform = 'scale(0.98)';
+    setTimeout(()=> location.href = 'payment.html', 220);
+  });
+
+  // admin: go to admin page (browser basic auth will pop)
+  document.getElementById('admin').addEventListener('click', ()=> {
+    location.href = '/admin.html';
+  });
+
+  // subtle parallax while moving mouse (luxury feel)
+  const stage = document.getElementById('stage');
+  stage.addEventListener('mousemove', (e)=>{
+    const x = (e.clientX/window.innerWidth - 0.5) * 20;
+    const y = (e.clientY/window.innerHeight - 0.5) * 20;
+    document.querySelector('.shape.s1').style.transform = `translate(${x}px, ${y}px) rotate(12deg)`;
+    document.querySelector('.shape.s2').style.transform = `translate(${x*-0.6}px, ${y*-0.6}px) rotate(-12deg)`;
+  });
+</script>
+</body>
+</html>

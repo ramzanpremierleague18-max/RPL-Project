@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>RPL — Payment & Upload</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg1:#0b0310;
+    --muted:#c9c3d0;
+    --accentA:#a26cff; /* purple */
+    --accentB:#ff9ab3; /* rose */
+    --glass: rgba(255,255,255,0.03);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;font-family:Montserrat,system-ui;background:
+    radial-gradient(500px 300px at 15% 20%, rgba(162,108,255,0.06), transparent),
+    linear-gradient(180deg,#05020a,var(--bg1));color:#fff;display:flex;align-items:center;justify-content:center;padding:28px}
+  .wrap{width:100%;max-width:1100px}
+  .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:16px;padding:22px;box-shadow:0 30px 80px rgba(0,0,0,0.6);border:1px solid var(--glass)}
+  header{display:flex;justify-content:space-between;align-items:center}
+  .title{font-size:20px;font-weight:800}
+  .sub{color:var(--muted);font-size:13px}
+  .grid{display:grid;grid-template-columns:1fr 360px;gap:18px;margin-top:16px}
+  .qr-card{padding:12px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));display:flex;flex-direction:column;align-items:center;gap:12px;justify-content:center}
+  .qr-box{width:100%;height:420px;border-radius:12px;background:#fff;padding:12px;display:flex;align-items:center;justify-content:center}
+  .qr-box img{width:100%;height:100%;object-fit:contain;transition:all .22s ease}
+  .controls{display:flex;gap:10px;margin-top:8px}
+  .btn{background:linear-gradient(90deg,var(--accentA),var(--accentB));color:#081018;padding:12px 14px;border-radius:12px;border:0;font-weight:900;cursor:pointer}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+  .meta{color:var(--muted);font-size:13px}
+  .upline{display:flex;flex-direction:column;gap:8px}
+  .filebox{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+  .preview{width:180px;height:160px;object-fit:cover;border-radius:10px;border:2px solid rgba(255,255,255,0.03)}
+  .status{margin-top:12px;padding:10px;border-radius:10px}
+  .ok{background:#0af09d;color:#032916}
+  .err{background:#ff6b6b;color:#300}
+  @media(max-width:980px){ .grid{grid-template-columns:1fr; } .qr-box{height:320px} }
+
+  /* Celebration overlay */
+  .celebrate-overlay{
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:9999;
+    pointer-events:none;
+  }
+  .celebrate-overlay.show{display:flex;pointer-events:auto}
+  .celebrate-card{
+    display:flex;
+    gap:18px;
+    align-items:center;
+    background:linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,255,255,0.95));
+    color:#081018;
+    padding:18px 22px;
+    border-radius:12px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.45);
+    transform:translateY(12px);
+    animation: popIn .28s ease both;
+  }
+  @keyframes popIn { from { opacity:0; transform:translateY(20px) scale(.98) } to { opacity:1; transform:translateY(0) scale(1) } }
+  .dancers{display:flex;gap:10px;align-items:flex-end;font-size:30px}
+  .dancer{display:inline-block;transform-origin:center bottom;animation: dance 900ms infinite ease-in-out; animation-delay: var(--delay, 0ms)}
+  .dancer:nth-child(2){ --delay:120ms }
+  .dancer:nth-child(3){ --delay:240ms }
+  .dancer:nth-child(4){ --delay:80ms }
+  @keyframes dance{
+    0% { transform: translateY(0) rotate(-6deg) scale(1) }
+    25% { transform: translateY(-10px) rotate(6deg) scale(1.03) }
+    50% { transform: translateY(0) rotate(-6deg) scale(1) }
+    75% { transform: translateY(-8px) rotate(8deg) scale(1.02) }
+    100% { transform: translateY(0) rotate(-6deg) scale(1) }
+  }
+  canvas.confetti-canvas{position:fixed;inset:0;pointer-events:none;z-index:9998}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <header>
+        <div>
+          <div class="title">RPL — Payment & Upload</div>
+          <div class="sub">Large QR, clear uploads — optimized for mobile scanning</div>
+        </div>
+        <div>
+          <a class="btn ghost" href="register.html">← Back to Details</a>
+        </div>
+      </header>
+
+      <div class="grid">
+        <div class="qr-card">
+          <div class="upline">
+            <div class="meta">UPI ID</div>
+            <div style="font-weight:900;font-size:18px" id="fixedUpi">alikhann042004-2@oksbi</div>
+            <div class="meta">Amount to pay</div>
+            <div style="font-weight:900;font-size:24px">₹ <span id="amount">499</span></div>
+          </div>
+
+          <div class="qr-box" id="qrArea">
+            <img id="qrImage" src="/images/qr-default.jpg" alt="qr">
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:center">
+            <button id="generate" class="btn">Generate QR</button>
+            <button id="openUpi" class="btn ghost">Open UPI App</button>
+            <button id="download" class="btn ghost" disabled>Download</button>
+          </div>
+
+          <div class="meta" style="margin-top:8px">Tip: Use <strong>Generate QR</strong> then scan from your phone.</div>
+        </div>
+
+        <div>
+          <label class="meta">Payment screenshot *</label>
+          <input type="file" id="paymentFile" accept="image/*">
+          <div class="filebox">
+            <img id="paymentPreview" class="preview" alt="payment preview" style="display:none">
+            <div class="meta">Show UPI app success screen. Clear, uncropped.</div>
+          </div>
+
+          <label class="meta" style="margin-top:12px">Passport / Face photo *</label>
+          <input type="file" id="passportFile" accept="image/*">
+          <div class="filebox">
+            <img id="passportPreview" class="preview" alt="passport preview" style="display:none">
+            <div class="meta">Full face visible; avoid filters.</div>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:14px">
+            <button id="submit" class="btn">Submit Registration</button>
+            <button id="clear" class="btn ghost">Clear Uploads</button>
+          </div>
+
+          <div id="status" class="status" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- confetti canvas + celebration overlay -->
+  <canvas id="confettiCanvas" class="confetti-canvas"></canvas>
+
+  <div id="celebrate" class="celebrate-overlay" aria-hidden="true">
+    <div class="celebrate-card" role="dialog" aria-live="polite">
+      <div style="font-size:18px;font-weight:900">🎉 Registration Saved!</div>
+      <div style="display:flex;flex-direction:column;align-items:center">
+        <div class="dancers" aria-hidden="true">
+          <div class="dancer">🕺</div>
+          <div class="dancer">💃</div>
+          <div class="dancer">🕺</div>
+          <div class="dancer">🎵</div>
+        </div>
+        <div style="font-size:13px;color:#083030;margin-top:6px">Thanks! Redirecting...</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // load details from localStorage (set on register page)
+  document.getElementById('fixedUpi').textContent = 'alikhann042004-2@oksbi';
+  document.getElementById('amount').textContent = '499';
+
+  const name = localStorage.getItem('rpl_name') || '';
+  const email = localStorage.getItem('rpl_email') || '';
+
+  // QR generation
+  async function generateQR(){
+    const img = document.getElementById('qrImage');
+    img.src = '/images/qr-default.jpg';
+    document.getElementById('download').disabled = true;
+    try {
+      const res = await fetch(`/qr?upi=${encodeURIComponent(document.getElementById('fixedUpi').textContent)}&amount=499`);
+      if(!res.ok) throw new Error('QR fetch failed '+res.status);
+      const data = await res.text();
+      if(data && data.startsWith('data:image')) {
+        img.src = data;
+      } else {
+        img.src = data; // fallback path
+      }
+      document.getElementById('download').disabled = false;
+      showStatus('QR generated — scan with your UPI app', 'ok');
+    } catch(err){
+      console.error('QR err', err);
+      img.src = '/images/qr-default.jpg';
+      showStatus('Could not generate QR. Showing fallback.', 'err');
+    }
+  }
+  document.getElementById('generate').addEventListener('click', generateQR);
+  document.getElementById('openUpi').addEventListener('click', ()=> {
+    location.href = `upi://pay?pa=${encodeURIComponent(document.getElementById('fixedUpi').textContent)}&am=499&tn=${encodeURIComponent('RPL Registration')}&cu=INR`;
+  });
+  document.getElementById('download').addEventListener('click', ()=>{
+    const href = document.getElementById('qrImage').src;
+    const a = document.createElement('a'); a.href = href; a.download = 'rpl_upi_qr.png'; a.click();
+  });
+
+  // Previews
+  function showPreview(inputId, imgId){
+    const f = document.getElementById(inputId).files[0];
+    if(!f) return;
+    const img = document.getElementById(imgId);
+    img.src = URL.createObjectURL(f);
+    img.style.display = 'block';
+  }
+  document.getElementById('paymentFile').addEventListener('change', ()=> showPreview('paymentFile','paymentPreview'));
+  document.getElementById('passportFile').addEventListener('change', ()=> showPreview('passportFile','passportPreview'));
+
+  // Submit registration to /save-registration
+  async function doSubmit(){
+    const pfile = document.getElementById('paymentFile').files[0];
+    const phfile = document.getElementById('passportFile').files[0];
+    if(!pfile || !phfile){
+      alert('Please upload both payment screenshot and passport photo.');
+      return;
+    }
+
+    // build form data using stored details
+    const fd = new FormData();
+    fd.append('playerName', localStorage.getItem('rpl_name') || '');
+    fd.append('playerMobile', localStorage.getItem('rpl_mobile') || '');
+    fd.append('playerEmail', localStorage.getItem('rpl_email') || '');
+    fd.append('playerRole', localStorage.getItem('rpl_role') || '');
+    fd.append('payment_screenshot', pfile);
+    fd.append('passport_photo', phfile);
+
+    const btn = document.getElementById('submit'); btn.disabled = true;
+    showStatus('Uploading...', 'ok');
+
+    try {
+      const res = await fetch('/save-registration', { method:'POST', body: fd });
+      const raw = await res.text();
+      let j;
+      try { j = JSON.parse(raw); } catch(e) { throw new Error('Invalid server response: '+ raw); }
+
+      if(j.ok){
+        showStatus('Saved. Registration ID: '+j.id, 'ok');
+        // Celebration: show confetti + dancers
+        triggerCelebration();
+        // After celebration redirect to success page
+        setTimeout(()=> location.href = '/success.html?id=' + j.id, 1400);
+      } else {
+        showStatus('Save failed: ' + (j.error || raw), 'err');
+      }
+    } catch(err){
+      console.error('submit err', err);
+      showStatus('Network error: ' + (err.message || err), 'err');
+    } finally { btn.disabled = false; }
+  }
+  document.getElementById('submit').addEventListener('click', doSubmit);
+
+  document.getElementById('clear').addEventListener('click', ()=>{
+    document.getElementById('paymentFile').value = '';
+    document.getElementById('passportFile').value = '';
+    document.getElementById('paymentPreview').style.display = 'none';
+    document.getElementById('passportPreview').style.display = 'none';
+    showStatus('', null);
+  });
+
+  function showStatus(msg, kind){
+    const el = document.getElementById('status');
+    if(!msg){ el.style.display='none'; el.textContent=''; return; }
+    el.style.display='block';
+    el.textContent = msg;
+    el.className = 'status ' + (kind==='ok' ? 'ok' : 'err');
+  }
+
+  // auto-generate QR on load for quicker UX
+  setTimeout(generateQR, 700);
+
+  /* ---------------- Confetti code ---------------- */
+  const canvas = document.getElementById('confettiCanvas');
+  const ctx = canvas.getContext && canvas.getContext('2d');
+  function resizeCanvas(){ canvas.width = innerWidth; canvas.height = innerHeight; }
+  addEventListener('resize', resizeCanvas); resizeCanvas();
+
+  let confettiPieces = [];
+  function spawnConfetti(count=80){
+    const colors = ['#ff3c6b','#ffd36b','#7afcff','#8b5cff','#ffd1e6','#a26cff','#00d3b8'];
+    for(let i=0;i<count;i++){
+      confettiPieces.push({
+        x: Math.random()*canvas.width,
+        y: -Math.random()*canvas.height,
+        vx: (Math.random()-0.5)*6,
+        vy: 2 + Math.random()*6,
+        s: 6 + Math.random()*12,
+        r: Math.random()*360,
+        color: colors[Math.floor(Math.random()*colors.length)],
+        rotSpeed: (Math.random()-0.5)*10
+      });
+    }
+  }
+
+  function confettiFrame(){
+    if(!ctx) return;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    for(let i=confettiPieces.length-1;i>=0;i--){
+      const p = confettiPieces[i];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.06; p.r += p.rotSpeed*0.02;
+      ctx.save();
+      ctx.translate(p.x,p.y); ctx.rotate(p.r*Math.PI/180);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.s/2, -p.s/2, p.s, p.s*0.6);
+      ctx.restore();
+      if(p.y > canvas.height + 50) confettiPieces.splice(i,1);
+    }
+    if(confettiPieces.length) requestAnimationFrame(confettiFrame);
+    else ctx.clearRect(0,0,canvas.width,canvas.height);
+  }
+
+  function startConfetti(){
+    spawnConfetti(90);
+    confettiFrame();
+    setTimeout(()=> spawnConfetti(60), 220);
+    setTimeout(()=> spawnConfetti(40), 480);
+  }
+
+  function triggerCelebration(){
+    // overlay show
+    const overlay = document.getElementById('celebrate');
+    overlay.classList.add('show');
+    // start confetti
+    startConfetti();
+    // hide overlay after 1.3s
+    setTimeout(()=> overlay.classList.remove('show'), 1300);
+  }
+</script>
+</body>
+</html>

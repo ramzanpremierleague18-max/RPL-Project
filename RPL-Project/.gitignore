@@ -1,0 +1,17 @@
+# Node/npm
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment / secrets
+.env
+
+# Uploaded files (should stay local)
+uploads/
+admin_unlock.json
+
+# Logs / OS files
+*.log
+.DS_Store
+Thumbs.db
+.vscode/

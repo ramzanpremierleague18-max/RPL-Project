@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RPL — Success</title>
+<style>
+  body{margin:0;font-family:Arial;background:#071018;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh}
+  .card{background:#092027;padding:22px;border-radius:12px;text-align:center;width:90%;max-width:420px}
+  .id{font-size:28px;color:#7afcff;margin-top:12px;font-weight:800}
+  a{color:#ffd36b;text-decoration:none;display:inline-block;margin-top:16px}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h2>Registration Submitted 🎉</h2>
+    <p>Your registration is recorded. Admin will verify payment shortly.</p>
+    <div class="id" id="rid">—</div>
+    <a href="register.html">Register another player</a>
+  </div>
+
+<script>
+  const p = new URLSearchParams(location.search);
+  const id = p.get('id') || '—';
+  document.getElementById('rid').textContent = id;
+</script>
+<script src="/js/bg-audio.js"></script>
+</body>
+</html>

@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RPL Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#071017;--panel:#0f1620;--muted:#9aa8b2;--accent:#d4af37;--ok:#2ecc71;--err:#ff4757}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,system-ui,Arial;background:linear-gradient(180deg,#041018,var(--bg));color:#eef3f7;min-height:100vh}
+  .wrap{max-width:1200px;margin:28px auto;padding:18px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  h1{margin:0}
+  .controls{display:flex;gap:10px;align-items:center}
+  input.search{padding:10px;border-radius:10px;border:0;background:#07121a;color:#fff;min-width:200px}
+  .btn{background:var(--accent);color:#120707;padding:8px 12px;border-radius:10px;border:0;font-weight:700;cursor:pointer}
+  .ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);padding:8px 12px;border-radius:10px}
+  .card{background:linear-gradient(180deg,var(--panel), rgba(255,255,255,0.01));border-radius:12px;padding:14px;margin-top:18px}
+  table{width:100%;border-collapse:collapse;margin-top:10px}
+  th,td{padding:10px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.03);font-size:14px;vertical-align:middle}
+  th{color:var(--muted);font-weight:700}
+  .thumb{width:84px;height:56px;object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,0.02)}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
+  .badge{padding:6px 8px;border-radius:8px;font-weight:700;font-size:12px}
+  .pending{background:#ffe6e6;color:#5f1b1b}
+  .verified{background:linear-gradient(90deg,var(--ok),#9ff1c8);color:#022508}
+  .rejected{background:linear-gradient(90deg,var(--err),#ffb3b3);color:#420000}
+  .modal{position:fixed;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);z-index:10000}
+  .hidden{display:none}
+  .toast{position:fixed;right:18px;bottom:18px;background:rgba(0,0,0,0.6);padding:12px 16px;border-radius:10px;color:#fff;z-index:10001}
+  canvas.confetti{position:fixed;inset:0;z-index:9998;pointer-events:none}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>RPL — Admin Dashboard</h1>
+        <div style="color:#9aa8b2;font-size:13px">Designed & Developed by Noor Ali</div>
+      </div>
+      <div class="controls">
+        <input id="search" class="search" placeholder="Search name / mobile / email / role">
+        <button id="loginBtn" class="btn">Login</button>
+        <button id="refresh" class="ghost">Refresh</button>
+      </div>
+    </header>
+
+    <div class="card">
+      <table id="listTable">
+        <thead><tr><th>ID</th><th>Player</th><th>Mobile</th><th>Email</th><th>Role</th><th>Payment</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- login modal -->
+  <div id="loginModal" class="modal hidden">
+    <div style="background:#07121a;padding:18px;border-radius:10px;min-width:320px">
+      <h3 style="margin:0 0 8px">Admin Login</h3>
+      <input id="admUser" placeholder="Username" style="width:100%;padding:8px;margin-top:6px;border-radius:6px;border:0;background:#07121a;color:#fff">
+      <input id="admPass" type="password" placeholder="Password" style="width:100%;padding:8px;margin-top:8px;border-radius:6px;border:0;background:#07121a;color:#fff">
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+        <button id="cancelLogin" class="ghost">Cancel</button>
+        <button id="doLogin" class="btn">Login</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <canvas id="cnv" class="confetti"></canvas>
+
+<script>
+const el = id => document.getElementById(id);
+let AUTH = null;
+let regs = [];
+
+function toast(msg){ const t = el('toast'); t.textContent = msg; t.classList.remove('hidden'); setTimeout(()=> t.classList.add('hidden'),2200); }
+
+el('loginBtn').addEventListener('click', ()=> el('loginModal').classList.remove('hidden'));
+el('cancelLogin').addEventListener('click', ()=> el('loginModal').classList.add('hidden'));
+el('doLogin').addEventListener('click', ()=> {
+  const u = el('admUser').value.trim(), p = el('admPass').value.trim();
+  if(!u||!p){ toast('Enter credentials'); return; }
+  AUTH = 'Basic ' + btoa(u + ':' + p);
+  el('loginModal').classList.add('hidden');
+  load();
+});
+
+async function apiGet(url){
+  const res = await fetch(url, { headers: { Authorization: AUTH }});
+  if(res.status === 401 || res.status === 403){ toast('Auth failed'); AUTH = null; el('loginModal').classList.remove('hidden'); return null; }
+  return res;
+}
+
+async function load(){
+  const res = await apiGet('/registrations'); if(!res) return;
+  regs = await res.json(); render(regs);
+}
+
+function render(list){
+  const tbody = document.querySelector('#listTable tbody'); tbody.innerHTML = '';
+  if(!list.length){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#9aa8b2;padding:14px">No registrations</td></tr>'; return; }
+  list.forEach(r=>{
+    const tr = document.createElement('tr');
+    const pay = r.payment_screenshot ? `<a href="#" class="imglink" data-url="${r.payment_screenshot}"><img class="thumb" src="${r.payment_screenshot}"></a>` : '—';
+    const status = r.payment_status || 'pending';
+    const badge = status === 'verified' ? `<span class="verified">VERIFIED</span>` : status === 'rejected' ? `<span class="rejected">REJECTED</span>` : `<span class="pending">PENDING</span>`;
+    tr.innerHTML = `<td>${r.id}</td>
+      <td><strong>${escapeHtml(r.playerName)}</strong></td>
+      <td>${escapeHtml(r.playerMobile)}</td>
+      <td>${escapeHtml(r.playerEmail)}</td>
+      <td>${escapeHtml(r.playerRole)}</td>
+      <td>${pay}</td>
+      <td>${badge}</td>
+      <td>
+        <div class="actions">
+          <button class="btn v" data-id="${r.id}">Verify</button>
+          <button class="ghost x" data-id="${r.id}">Reject</button>
+          <button class="ghost d" data-id="${r.id}">Delete</button>
+        </div>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function escapeHtml(s){ if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+document.querySelector('#listTable tbody').addEventListener('click', async e=>{
+  const b = e.target.closest('button'); if(b){
+    const id = b.dataset.id;
+    if(b.classList.contains('v')) return verify(id,b);
+    if(b.classList.contains('x')) return reject(id,b);
+    if(b.classList.contains('d')) return remove(id,b);
+  }
+  const a = e.target.closest('.imglink');
+  if(a){ e.preventDefault(); openFile(a.dataset.url); }
+});
+
+async function callPost(url){
+  const res = await fetch(url, { method:'POST', headers:{ Authorization: AUTH }});
+  return res.json();
+}
+
+async function verify(id, btn){
+  if(!confirm('Verify registration '+id+'?')) return;
+  btn.disabled = true;
+  const j = await callPost('/admin/verify/' + id);
+  if(j.ok){ playConfetti(); toast('Verified & email sent'); await load(); } else toast('Verify failed');
+  btn.disabled = false;
+}
+
+async function reject(id, btn){
+  if(!confirm('Reject registration '+id+'?')) return;
+  btn.disabled = true;
+  const j = await callPost('/admin/reject/' + id);
+  if(j.ok){ flashRed(); toast('Rejected'); await load(); } else toast('Reject failed');
+  btn.disabled = false;
+}
+
+async function remove(id, btn){
+  if(!confirm('Delete permanently?')) return;
+  btn.disabled = true;
+  const j = await callPost('/admin/delete/' + id);
+  if(j.ok){ toast('Deleted'); await load(); } else toast('Delete failed');
+  btn.disabled = false;
+}
+
+async function openFile(url){
+  try {
+    if(!AUTH){ toast('Login first'); el('loginModal').classList.remove('hidden'); return; }
+    const r = await fetch(url, { headers:{ Authorization: AUTH }});
+    if(!r.ok) { toast('Failed to fetch file'); return; }
+    const blob = await r.blob();
+    const u = URL.createObjectURL(blob);
+    window.open(u, '_blank');
+    setTimeout(()=> URL.revokeObjectURL(u), 60000);
+  } catch(e){ console.error(e); toast('Error opening file'); }
+}
+
+// confetti
+const cnv = el('cnv'); const ctx = cnv.getContext && cnv.getContext('2d'); function resize(){ cnv.width = innerWidth; cnv.height = innerHeight; } addEventListener('resize', resize); resize();
+let pieces = [];
+function playConfetti(){
+  const colors = ['#ff3c6b','#ffd36b','#7afcff','#8b5cff','#ffd1e6'];
+  for(let i=0;i<90;i++) pieces.push({ x: Math.random()*cnv.width, y:-20, vx:(Math.random()-0.5)*6, vy:2+Math.random()*6, s:6+Math.random()*12, r:Math.random()*360, color:colors[Math.floor(Math.random()*colors.length)], rot:(Math.random()-0.5)*10 });
+  const end = Date.now() + 900;
+  (function frame(){
+    ctx.clearRect(0,0,cnv.width,cnv.height);
+    for(let i=pieces.length-1;i>=0;i--){
+      const p = pieces[i];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.06; p.r += p.rot*0.02;
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r*Math.PI/180);
+      ctx.fillStyle = p.color; ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s); ctx.restore();
+      if(p.y > cnv.height+50) pieces.splice(i,1);
+    }
+    if(Date.now() < end || pieces.length) requestAnimationFrame(frame);
+    else ctx.clearRect(0,0,cnv.width,cnv.height);
+  })();
+}
+
+function flashRed(){
+  const elb = document.createElement('div'); elb.style.position='fixed'; elb.style.left=0; elb.style.top=0; elb.style.right=0; elb.style.bottom=0; elb.style.background='linear-gradient(90deg,#ff6b6b,#ff1744)'; elb.style.zIndex=9997; elb.style.opacity=0; elb.style.transition='opacity .08s'; document.body.appendChild(elb);
+  requestAnimationFrame(()=> elb.style.opacity=1);
+  setTimeout(()=> elb.style.opacity=0, 1000);
+  setTimeout(()=> elb.remove(), 1200);
+}
+
+// refresh/search
+el('refresh').addEventListener('click', load);
+el('search').addEventListener('input', (e)=> {
+  const q = e.target.value.trim().toLowerCase();
+  render(regs.filter(r=> (r.playerName||'').toLowerCase().includes(q) || (r.playerMobile||'').includes(q) || (r.playerEmail||'').toLowerCase().includes(q) || (r.playerRole||'').toLowerCase().includes(q)));
+});
+</script>
+<script src="/js/bg-audio.js"></script>
+</body>
+</html>

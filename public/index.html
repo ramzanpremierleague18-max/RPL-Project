@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>RPL — Ramazan Premier League</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg1:#0b0712; --bg2:#2d001b; --accent1:#ff003c; --accent2:#ffb400;
+    --gold: #d4af37; --white:#fff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Montserrat,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:linear-gradient(135deg,var(--bg1),var(--bg2));color:var(--white);min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .fixed-credit{position:fixed;top:12px;right:18px;font-weight:700;color:var(--gold);z-index:60}
+  .container{width:100%;max-width:980px;padding:28px;display:flex;align-items:center;justify-content:center}
+  .card{width:100%;border-radius:20px;padding:44px;display:flex;flex-direction:column;align-items:center;gap:18px;backdrop-filter: blur(6px);box-shadow: 0 30px 80px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,0.04)}
+  h1{font-size:40px;letter-spacing:2px;margin:0;text-align:center;background:linear-gradient(90deg,var(--gold),#fff);-webkit-background-clip:text;background-clip:text;color:transparent;text-transform:uppercase}
+  p.lead{color:rgba(255,255,255,0.75);margin:6px 0 0;text-align:center}
+  .enter-btn{
+    margin-top:18px;padding:18px 30px;border-radius:14px;border:0;font-weight:900;font-size:18px;cursor:pointer;
+    background:linear-gradient(90deg,var(--accent1),var(--accent2)); color:#120007; box-shadow:0 20px 40px rgba(255,100,100,0.14), inset 0 -6px 20px rgba(0,0,0,0.12);
+    transform-origin:center; transition:transform .35s cubic-bezier(.2,.9,.3,1), box-shadow .25s;
+  }
+  .enter-btn:hover{transform:translateY(-6px) scale(1.02); box-shadow:0 30px 60px rgba(255,120,120,0.18)}
+  .pulse { animation: pulse 1s ease-in-out; }
+  @keyframes pulse { 0%{transform:scale(1)}50%{transform:scale(1.05)}100%{transform:scale(1)} }
+
+  /* animated background shapes */
+  .bg-shape { position: absolute; border-radius:40% ; filter: blur(70px); opacity: .12; transform: translateZ(0); }
+  .s1{width:420px;height:420px;background:linear-gradient(135deg,#ff3c6b,#ffb400); top:-80px; left:-120px;}
+  .s2{width:360px;height:360px;background:linear-gradient(135deg,#2b8cff,#6e3bff); bottom:-120px; right:-100px; opacity:.14}
+
+  /* leave space for animation */
+  .sparkles{position:absolute;inset:0;pointer-events:none}
+
+  /* reveal animation */
+  .zoomOut { animation: zoomOut .9s ease forwards; }
+  @keyframes zoomOut { to { transform: scale(.22) translateY(-120px); opacity: 0 } }
+
+  @media(max-width:620px){
+    h1{font-size:26px}
+    .card{padding:20px}
+    .enter-btn{padding:14px 18px;font-size:16px}
+  }
+</style>
+</head>
+<body>
+  <div class="bg-shape s1"></div>
+  <div class="bg-shape s2"></div>
+  <div class="fixed-credit">Designed & Developed by Noor Ali</div>
+
+  <div class="container">
+    <div class="card" id="card">
+      <h1 id="title">RPL — Ramazan Premier League</h1>
+      <p class="lead">Season 1 • Community tournament — join now</p>
+      <button class="enter-btn" id="enter">Enter into Tournament</button>
+    </div>
+  </div>
+
+  <div class="sparkles" id="sparkles"></div>
+
+<script>
+  // Click -> play zoom animation then go to choices page
+  const enter = document.getElementById('enter');
+  const card = document.getElementById('card');
+  enter.addEventListener('click', ()=> {
+    enter.disabled = true;
+    enter.classList.add('pulse');
+    // short "flash" then zoom & redirect
+    setTimeout(()=> {
+      card.classList.add('zoomOut');
+      // small fireworks effect
+      runTinyBurst();
+    }, 250);
+    setTimeout(()=> {
+      location.href = 'choices.html';
+    }, 900);
+  });
+
+  // small burst of circles for immediate feedback
+  function runTinyBurst(){
+    const c = document.getElementById('sparkles');
+    for(let i=0;i<24;i++){
+      const d = document.createElement('div');
+      d.style.position='absolute';
+      const x = Math.random()*60 + 20;
+      const y = Math.random()*40 + 30;
+      d.style.left = x + '%';
+      d.style.top = y + '%';
+      const s = 8 + Math.random()*18;
+      d.style.width = d.style.height = s + 'px';
+      d.style.borderRadius = '50%';
+      d.style.background = i%2 ? 'rgba(255,255,255,0.9)' : 'rgba(212,175,55,0.9)';
+      d.style.transform = 'translate(-50%,-50%) scale(0.2)';
+      d.style.opacity = 1;
+      d.style.transition = 'transform .9s cubic-bezier(.2,.9,.2,1), opacity .9s';
+      c.appendChild(d);
+      setTimeout(()=> { d.style.transform = `translate(-50%,-50%) translate(${(Math.random()-0.5)*200}px,${-200 - Math.random()*200}px) scale(1)`; d.style.opacity=0 }, 30+i*12);
+      setTimeout(()=> d.remove(), 1200 + i*10);
+    }
+  }
+</script>
+<script src="/js/bg-audio.js"></script>
+</body>
+</html>
