@@ -1,10 +1,9 @@
 // migrate_db.js
-// Safe migration: add any missing columns to registrations table
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const DB_PATH = path.join(__dirname, 'rpl.db');
 
-const db = new sqlite3.Database(DB_PATH, (err) => {
+const db = new sqlite3.Database(DB_PATH, err => {
   if (err) {
     console.error('Failed to open DB:', err);
     process.exit(1);
@@ -26,7 +25,6 @@ async function run() {
     const cols = await getColumns();
     console.log('Existing columns:', cols.join(', '));
 
-    // columns we expect for the current server code
     const expected = {
       playerEmail: "TEXT",
       passport_photo: "TEXT",
@@ -63,7 +61,7 @@ async function run() {
     console.log('Migration complete.');
     db.close();
   } catch (err) {
-    console.error('Migration error:', err && (err.stack || err.message || err));
+    console.error('Migration error:', err);
     db.close();
     process.exit(1);
   }
