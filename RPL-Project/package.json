@@ -4,7 +4,12 @@
   "description": "RPL registration app",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "migrate-db": "node migrate_db.js",
+    "postinstall": "npm rebuild --build-from-source=sqlite3"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "body-parser": "^1.20.4",
@@ -15,10 +20,6 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^7.0.11",
     "qrcode": "^1.5.4",
-    "sqlite3": "^5.1.7",
-    "twilio": "^5.10.7"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+    "sqlite3": "^5.1.7"
+  }
 }
