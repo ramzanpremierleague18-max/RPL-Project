@@ -1,0 +1,20 @@
+# Node/npm
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment / secrets
+.env
+
+# Uploaded files (should stay local)
+uploads/
+admin_unlock.json
+
+# Local SQLite DB (ignore if you don't want to push local DB)
+rpl.db
+
+# Logs / OS files
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
