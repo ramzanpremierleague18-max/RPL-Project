@@ -27,7 +27,7 @@
   .rejected{background:linear-gradient(90deg,var(--err),#ffb3b3);color:#420000}
   .modal{position:fixed;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);z-index:10000}
   .hidden{display:none}
-  .toast{position:fixed;right:18px;bottom:18px;background:rgba(0,0,0,0.6);padding:12px 16px;border-radius:10px;color:#fff;z-index:10001}
+  .toast{position:fixed;right:18px;bottom:18px;background:rgba(3,3,3,0.7);padding:12px 16px;border-radius:10px;color:#fff;z-index:10001;max-width:360px;word-break:break-word}
   canvas.confetti{position:fixed;inset:0;z-index:9998;pointer-events:none}
 </style>
 </head>
@@ -46,17 +46,17 @@
     </header>
 
     <div class="card">
-      <table id="listTable">
-        <thead><tr><th>ID</th><th>Player</th><th>Mobile</th><th>Email</th><th>Role</th><th>Payment</th><th>Status</th><th>Actions</th></tr></thead>
+      <table id="listTable" aria-live="polite">
+        <thead><tr><th>ID</th><th>Player</th><th>Mobile</th><th>Email</th><th>Role</th><th>Player Photo</th><th>Payment</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
   </div>
 
   <!-- login modal -->
-  <div id="loginModal" class="modal hidden">
+  <div id="loginModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
     <div style="background:#07121a;padding:18px;border-radius:10px;min-width:320px">
-      <h3 style="margin:0 0 8px">Admin Login</h3>
+      <h3 id="loginTitle" style="margin:0 0 8px">Admin Login</h3>
       <input id="admUser" placeholder="Username" style="width:100%;padding:8px;margin-top:6px;border-radius:6px;border:0;background:#07121a;color:#fff">
       <input id="admPass" type="password" placeholder="Password" style="width:100%;padding:8px;margin-top:8px;border-radius:6px;border:0;background:#07121a;color:#fff">
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
@@ -70,47 +70,94 @@
   <canvas id="cnv" class="confetti"></canvas>
 
 <script>
+/* ===== Admin page script =====
+ - Stores Basic auth in sessionStorage so login persists in that tab
+ - Shows Player Photo (passport_photo) and Payment screenshot
+ - Uses same Authorization header to fetch protected images
+ - Shows server error messages in toast when action fails
+*/
 const el = id => document.getElementById(id);
-let AUTH = null;
+let AUTH = sessionStorage.getItem('rpl_admin_auth') || null;
 let regs = [];
 
-function toast(msg){ const t = el('toast'); t.textContent = msg; t.classList.remove('hidden'); setTimeout(()=> t.classList.add('hidden'),2200); }
+/* toast helper */
+function toast(msg, ms=3000){
+  const t = el('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=> t.classList.add('hidden'), ms);
+}
 
-el('loginBtn').addEventListener('click', ()=> el('loginModal').classList.remove('hidden'));
+/* show/hide login modal */
+el('loginBtn').addEventListener('click', ()=> {
+  el('loginModal').classList.remove('hidden');
+  el('admUser').focus();
+});
 el('cancelLogin').addEventListener('click', ()=> el('loginModal').classList.add('hidden'));
+
+/* login action */
 el('doLogin').addEventListener('click', ()=> {
   const u = el('admUser').value.trim(), p = el('admPass').value.trim();
-  if(!u||!p){ toast('Enter credentials'); return; }
+  if(!u||!p){ toast('Enter username & password'); return; }
   AUTH = 'Basic ' + btoa(u + ':' + p);
+  sessionStorage.setItem('rpl_admin_auth', AUTH);
   el('loginModal').classList.add('hidden');
   load();
 });
 
-async function apiGet(url){
-  const res = await fetch(url, { headers: { Authorization: AUTH }});
-  if(res.status === 401 || res.status === 403){ toast('Auth failed'); AUTH = null; el('loginModal').classList.remove('hidden'); return null; }
-  return res;
+/* API GET with Basic auth header */
+async function apiGet(path){
+  if(!AUTH){ toast('Please login first'); el('loginModal').classList.remove('hidden'); return null; }
+  try {
+    const res = await fetch(path, { headers:{ Authorization: AUTH }});
+    if(res.status === 401 || res.status === 403){
+      // clear stored auth
+      sessionStorage.removeItem('rpl_admin_auth');
+      AUTH = null;
+      toast('Auth failed — enter correct credentials');
+      el('loginModal').classList.remove('hidden');
+      return null;
+    }
+    return res;
+  } catch (err){
+    console.error('apiGet error', err);
+    toast('Network error: ' + (err.message||err));
+    return null;
+  }
 }
 
+/* load registrations */
 async function load(){
-  const res = await apiGet('/registrations'); if(!res) return;
-  regs = await res.json(); render(regs);
+  const res = await apiGet('/registrations');
+  if(!res) return;
+  if(!res.ok){ const txt = await res.text(); toast('Failed: ' + txt); return; }
+  regs = await res.json();
+  render(regs);
+  toast('Loaded ' + (regs.length || 0) + ' registrations', 2100);
 }
 
+/* render table with player photo + payment image */
 function render(list){
   const tbody = document.querySelector('#listTable tbody'); tbody.innerHTML = '';
-  if(!list.length){ tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#9aa8b2;padding:14px">No registrations</td></tr>'; return; }
-  list.forEach(r=>{
-    const tr = document.createElement('tr');
-    const pay = r.payment_screenshot ? `<a href="#" class="imglink" data-url="${r.payment_screenshot}"><img class="thumb" src="${r.payment_screenshot}"></a>` : '—';
+  if(!list.length){
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#9aa8b2;padding:14px">No registrations</td></tr>';
+    return;
+  }
+  list.forEach(r => {
+    const playerPhoto = r.passport_photo ? `<a href="#" class="open" data-url="${r.passport_photo}"><img class="thumb" src="${r.passport_photo}" alt="player"></a>` : '—';
+    const paymentImg = r.payment_screenshot ? `<a href="#" class="open" data-url="${r.payment_screenshot}"><img class="thumb" src="${r.payment_screenshot}" alt="payment"></a>` : '—';
     const status = r.payment_status || 'pending';
-    const badge = status === 'verified' ? `<span class="verified">VERIFIED</span>` : status === 'rejected' ? `<span class="rejected">REJECTED</span>` : `<span class="pending">PENDING</span>`;
-    tr.innerHTML = `<td>${r.id}</td>
-      <td><strong>${escapeHtml(r.playerName)}</strong></td>
-      <td>${escapeHtml(r.playerMobile)}</td>
-      <td>${escapeHtml(r.playerEmail)}</td>
-      <td>${escapeHtml(r.playerRole)}</td>
-      <td>${pay}</td>
+    const badge = status === 'verified' ? `<span class="verified badge">VERIFIED</span>` : status === 'rejected' ? `<span class="rejected badge">REJECTED</span>` : `<span class="pending badge">PENDING</span>`;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.id}</td>
+      <td><strong>${escapeHtml(r.playerName||'')}</strong></td>
+      <td>${escapeHtml(r.playerMobile||'')}</td>
+      <td>${escapeHtml(r.playerEmail||'')}</td>
+      <td>${escapeHtml(r.playerRole||'')}</td>
+      <td>${playerPhoto}</td>
+      <td>${paymentImg}</td>
       <td>${badge}</td>
       <td>
         <div class="actions">
@@ -123,62 +170,104 @@ function render(list){
   });
 }
 
-function escapeHtml(s){ if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+/* basic escape */
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-document.querySelector('#listTable tbody').addEventListener('click', async e=>{
-  const b = e.target.closest('button'); if(b){
-    const id = b.dataset.id;
-    if(b.classList.contains('v')) return verify(id,b);
-    if(b.classList.contains('x')) return reject(id,b);
-    if(b.classList.contains('d')) return remove(id,b);
+/* table click handlers (delegation) */
+document.querySelector('#listTable tbody').addEventListener('click', async e => {
+  const btn = e.target.closest('button');
+  if(btn){
+    const id = btn.dataset.id;
+    if(btn.classList.contains('v')) return verify(id, btn);
+    if(btn.classList.contains('x')) return reject(id, btn);
+    if(btn.classList.contains('d')) return removeReg(id, btn);
   }
-  const a = e.target.closest('.imglink');
-  if(a){ e.preventDefault(); openFile(a.dataset.url); }
+  const a = e.target.closest('a.open');
+  if(a){ e.preventDefault(); return openProtectedFile(a.dataset.url); }
 });
 
-async function callPost(url){
-  const res = await fetch(url, { method:'POST', headers:{ Authorization: AUTH }});
-  return res.json();
-}
-
-async function verify(id, btn){
-  if(!confirm('Verify registration '+id+'?')) return;
-  btn.disabled = true;
-  const j = await callPost('/admin/verify/' + id);
-  if(j.ok){ playConfetti(); toast('Verified & email sent'); await load(); } else toast('Verify failed');
-  btn.disabled = false;
-}
-
-async function reject(id, btn){
-  if(!confirm('Reject registration '+id+'?')) return;
-  btn.disabled = true;
-  const j = await callPost('/admin/reject/' + id);
-  if(j.ok){ flashRed(); toast('Rejected'); await load(); } else toast('Reject failed');
-  btn.disabled = false;
-}
-
-async function remove(id, btn){
-  if(!confirm('Delete permanently?')) return;
-  btn.disabled = true;
-  const j = await callPost('/admin/delete/' + id);
-  if(j.ok){ toast('Deleted'); await load(); } else toast('Delete failed');
-  btn.disabled = false;
-}
-
-async function openFile(url){
+/* helper to call POST actions with auth */
+async function postWithAuth(url){
+  if(!AUTH){ toast('Login required'); el('loginModal').classList.remove('hidden'); return null; }
   try {
-    if(!AUTH){ toast('Login first'); el('loginModal').classList.remove('hidden'); return; }
-    const r = await fetch(url, { headers:{ Authorization: AUTH }});
-    if(!r.ok) { toast('Failed to fetch file'); return; }
-    const blob = await r.blob();
+    const res = await fetch(url, { method:'POST', headers:{ Authorization: AUTH }});
+    if(res.status === 401 || res.status === 403){
+      sessionStorage.removeItem('rpl_admin_auth'); AUTH = null;
+      toast('Auth failed');
+      el('loginModal').classList.remove('hidden');
+      return null;
+    }
+    const data = await res.json().catch(()=> null);
+    return { ok: res.ok, status: res.status, data, text: await res.text().catch(()=> '') };
+  } catch (err){
+    console.error('post error', err);
+    toast('Network error: ' + (err.message||err));
+    return null;
+  }
+}
+
+/* verify: shows server message if any */
+async function verify(id, btn){
+  if(!confirm('Verify registration ' + id + '?')) return;
+  btn.disabled = true;
+  const res = await postWithAuth('/admin/verify/' + id);
+  btn.disabled = false;
+  if(!res) return;
+  if(res.ok){ toast('Verified: ' + (res.data && res.data.email ? res.data.email : 'skipped')); playConfetti(); load(); }
+  else {
+    const errMsg = (res.data && (res.data.detail||res.data.error)) || res.text || ('HTTP ' + res.status);
+    toast('Verify failed: ' + errMsg, 6000);
+    console.error('verify failed', res);
+  }
+}
+
+/* reject */
+async function reject(id, btn){
+  if(!confirm('Reject registration ' + id + '?')) return;
+  btn.disabled = true;
+  const res = await postWithAuth('/admin/reject/' + id);
+  btn.disabled = false;
+  if(!res) return;
+  if(res.ok){ toast('Rejected'); flashRed(); load(); }
+  else {
+    const errMsg = (res.data && (res.data.detail||res.data.error)) || res.text || ('HTTP ' + res.status);
+    toast('Reject failed: ' + errMsg, 6000);
+    console.error('reject failed', res);
+  }
+}
+
+/* delete */
+async function removeReg(id, btn){
+  if(!confirm('DELETE registration ' + id + ' — permanent?')) return;
+  btn.disabled = true;
+  const res = await postWithAuth('/admin/delete/' + id);
+  btn.disabled = false;
+  if(!res) return;
+  if(res.ok){ toast('Deleted'); load(); }
+  else {
+    const errMsg = (res.data && (res.data.detail||res.data.error)) || res.text || ('HTTP ' + res.status);
+    toast('Delete failed: ' + errMsg, 6000);
+    console.error('delete failed', res);
+  }
+}
+
+/* open protected file (fetch with auth and open blob) */
+async function openProtectedFile(url){
+  if(!AUTH){ toast('Login first'); el('loginModal').classList.remove('hidden'); return; }
+  try {
+    const res = await fetch(url, { headers:{ Authorization: AUTH }});
+    if(res.status === 401 || res.status === 403){ toast('Cannot open file — auth failed'); sessionStorage.removeItem('rpl_admin_auth'); AUTH = null; el('loginModal').classList.remove('hidden'); return; }
+    if(!res.ok){ toast('Failed to fetch file'); return; }
+    const blob = await res.blob();
     const u = URL.createObjectURL(blob);
     window.open(u, '_blank');
     setTimeout(()=> URL.revokeObjectURL(u), 60000);
-  } catch(e){ console.error(e); toast('Error opening file'); }
+  } catch (err){ console.error(err); toast('Error opening file: ' + (err.message||err)); }
 }
 
-// confetti
-const cnv = el('cnv'); const ctx = cnv.getContext && cnv.getContext('2d'); function resize(){ cnv.width = innerWidth; cnv.height = innerHeight; } addEventListener('resize', resize); resize();
+/* confetti & flash visuals */
+const cnv = el('cnv'); const ctx = cnv.getContext && cnv.getContext('2d');
+function resize(){ cnv.width = innerWidth; cnv.height = innerHeight; } addEventListener('resize', resize); resize();
 let pieces = [];
 function playConfetti(){
   const colors = ['#ff3c6b','#ffd36b','#7afcff','#8b5cff','#ffd1e6'];
@@ -197,7 +286,6 @@ function playConfetti(){
     else ctx.clearRect(0,0,cnv.width,cnv.height);
   })();
 }
-
 function flashRed(){
   const elb = document.createElement('div'); elb.style.position='fixed'; elb.style.left=0; elb.style.top=0; elb.style.right=0; elb.style.bottom=0; elb.style.background='linear-gradient(90deg,#ff6b6b,#ff1744)'; elb.style.zIndex=9997; elb.style.opacity=0; elb.style.transition='opacity .08s'; document.body.appendChild(elb);
   requestAnimationFrame(()=> elb.style.opacity=1);
@@ -205,13 +293,23 @@ function flashRed(){
   setTimeout(()=> elb.remove(), 1200);
 }
 
-// refresh/search
+/* refresh & search */
 el('refresh').addEventListener('click', load);
-el('search').addEventListener('input', (e)=> {
-  const q = e.target.value.trim().toLowerCase();
-  render(regs.filter(r=> (r.playerName||'').toLowerCase().includes(q) || (r.playerMobile||'').includes(q) || (r.playerEmail||'').toLowerCase().includes(q) || (r.playerRole||'').toLowerCase().includes(q)));
+el('search').addEventListener('input', (e)=>{
+  const q = (e.target.value||'').trim().toLowerCase();
+  if(!q) return render(regs);
+  render(regs.filter(r => (r.playerName||'').toLowerCase().includes(q) || (r.playerMobile||'').includes(q) || (r.playerEmail||'').toLowerCase().includes(q) || (r.playerRole||'').toLowerCase().includes(q)));
 });
+
+/* auto-login if session stored */
+(function init(){
+  if(AUTH){
+    // verify quickly by fetching registrations
+    load();
+  } else {
+    // show login prompt on first open? Not automatically — let user click.
+  }
+})();
 </script>
-<script src="/js/bg-audio.js"></script>
 </body>
 </html>
