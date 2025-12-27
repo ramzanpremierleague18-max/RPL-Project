@@ -8,77 +8,143 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700;800&display=swap" rel="stylesheet">
 
 <style>
-/* ===== BASE THEME ===== */
-:root{--bg:#071017;--panel:#0f1620;--muted:#9aa8b2;--accent:#d4af37;--ok:#2ecc71;--err:#ff4757}
-*{box-sizing:border-box}
-body{margin:0;font-family:Inter,system-ui,Arial;background:linear-gradient(180deg,#041018,var(--bg));color:#eef3f7;min-height:100vh}
-.wrap{max-width:1200px;margin:28px auto;padding:18px}
-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
-h1{margin:0}
-.controls{display:flex;gap:10px;align-items:center}
-input.search{padding:10px;border-radius:10px;border:0;background:#07121a;color:#fff;min-width:200px}
-.btn{background:var(--accent);color:#120707;padding:8px 12px;border-radius:10px;border:0;font-weight:700;cursor:pointer}
-.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);padding:8px 12px;border-radius:10px}
-.card{background:linear-gradient(180deg,var(--panel), rgba(255,255,255,0.01));border-radius:12px;padding:14px;margin-top:18px}
-table{width:100%;border-collapse:collapse;margin-top:10px}
-th,td{padding:10px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.03);font-size:14px}
-th{color:var(--muted)}
-.thumb{width:84px;height:56px;object-fit:cover;border-radius:6px}
-.actions{display:flex;gap:8px}
-.badge{padding:6px 8px;border-radius:8px;font-weight:700;font-size:12px}
-.pending{background:#ffe6e6;color:#852020}
-.verified{background:#2ecc71;color:#022508}
-.rejected{background:#ff4757;color:#fff}
+:root{
+  --bg:#070f17;
+  --panel:#0e1622;
+  --accent:#f5c451;
+  --ok:#3ddc97;
+  --err:#ff5c5c;
+  --text:#eef3f7;
+  --muted:#9aa8b2;
+}
 
-/* ===== MODALS / TOAST ===== */
-.modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Inter,system-ui,Arial;
+  background:radial-gradient(circle at top,#0b1c2e,#040a11);
+  color:var(--text);
+  min-height:100vh;
+}
+
+.wrap{max-width:1200px;margin:30px auto;padding:18px}
+
+header{display:flex;justify-content:space-between;align-items:center}
+h1{margin:0;font-weight:800}
+
+.controls{display:flex;gap:10px}
+
+.btn{
+  background:linear-gradient(135deg,var(--accent),#ffd97a);
+  color:#1a1200;
+  padding:9px 14px;
+  border-radius:12px;
+  border:0;
+  font-weight:800;
+  cursor:pointer;
+  transition:.25s;
+}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(245,196,81,.45)}
+
+.ghost{
+  background:transparent;
+  border:1px solid rgba(255,255,255,.08);
+  color:var(--muted);
+  padding:9px 14px;
+  border-radius:12px;
+  cursor:pointer;
+  transition:.25s;
+}
+.ghost:hover{background:rgba(255,255,255,.05)}
+
+.card{
+  margin-top:20px;
+  background:linear-gradient(180deg,var(--panel),rgba(255,255,255,.02));
+  border-radius:18px;
+  padding:16px;
+}
+
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;font-size:14px;border-bottom:1px solid rgba(255,255,255,.04)}
+th{color:var(--muted)}
+
+.thumb{
+  width:80px;
+  height:56px;
+  object-fit:cover;
+  border-radius:8px;
+  cursor:pointer;
+  transition:.25s;
+}
+.thumb:hover{transform:scale(1.06)}
+
+.actions{display:flex;gap:8px}
+
+/* STATUS */
+.pending{color:#f7b731}
+.verified{color:var(--ok);font-weight:700}
+.rejected{color:var(--err);font-weight:700}
+
+/* MODALS */
+.modal{
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,.75);
+  z-index:999;
+}
 .hidden{display:none}
+
+.image-box{
+  background:#050b12;
+  padding:14px;
+  border-radius:18px;
+  animation:zoomIn .35s ease;
+}
+.image-box img{
+  max-width:90vw;
+  max-height:80vh;
+  border-radius:14px;
+}
+
+/* TOAST */
 .toast{
   position:fixed;
-  right:18px;
-  bottom:18px;
-  background:rgba(0,0,0,0.6);
-  backdrop-filter:blur(12px);
-  padding:12px 16px;
-  border-radius:10px;
-  animation:toastIn .4s ease forwards;
+  right:20px;
+  bottom:20px;
+  background:linear-gradient(135deg,var(--ok),#6bf5b3);
+  color:#042a18;
+  padding:14px 18px;
+  border-radius:14px;
+  font-weight:800;
+  box-shadow:0 12px 40px rgba(61,220,151,.45);
+  animation:slideIn .45s ease;
 }
 
-/* ===== PREMIUM ANIMATIONS ===== */
-@keyframes rowIn{
-  from{opacity:0;transform:translateY(16px) scale(.97)}
-  to{opacity:1;transform:translateY(0) scale(1)}
+/* ANIMATIONS */
+@keyframes zoomIn{
+  from{transform:scale(.85);opacity:0}
+  to{transform:scale(1);opacity:1}
 }
-tbody tr{animation:rowIn .45s ease forwards}
-
-.btn,.ghost{transition:all .25s ease}
-.btn:hover{box-shadow:0 0 18px rgba(212,175,55,.6);transform:translateY(-1px)}
-.ghost:hover{background:rgba(255,255,255,.06)}
-
-@keyframes toastIn{
-  from{opacity:0;transform:translateX(40px)}
-  to{opacity:1;transform:translateX(0)}
+@keyframes slideIn{
+  from{transform:translateX(60px);opacity:0}
+  to{transform:translateX(0);opacity:1}
 }
-
-@keyframes successPulse{
-  0%{box-shadow:0 0 0 rgba(46,204,113,.9)}
-  70%{box-shadow:0 0 28px rgba(46,204,113,0)}
-  100%{box-shadow:0 0 0 rgba(46,204,113,0)}
-}
-.pulse{animation:successPulse .9s ease}
 </style>
 </head>
 
 <body>
+
 <div class="wrap">
 <header>
 <div>
 <h1>RPL — Admin Dashboard</h1>
-<div style="font-size:13px;color:#9aa8b2">Designed & Developed by Noor Ali</div>
+<div style="color:var(--muted);font-size:13px">Designed & Developed by Noor Ali</div>
 </div>
 <div class="controls">
-<input id="search" class="search" placeholder="Search">
-<button id="exportExcel" class="btn ghost">⬇ Download Excel</button>
+<button id="exportExcel" class="ghost">⬇ Excel</button>
 <button id="loginBtn" class="btn">Login</button>
 <button id="refresh" class="ghost">Refresh</button>
 </div>
@@ -97,14 +163,21 @@ tbody tr{animation:rowIn .45s ease forwards}
 </div>
 </div>
 
-<!-- LOGIN MODAL -->
+<!-- LOGIN -->
 <div id="loginModal" class="modal hidden">
-<div style="background:#07121a;padding:20px;border-radius:10px">
+<div class="image-box">
 <h3>Admin Login</h3>
 <input id="admUser" placeholder="Username"><br><br>
 <input id="admPass" type="password" placeholder="Password"><br><br>
 <button id="doLogin" class="btn">Login</button>
 <button id="cancelLogin" class="ghost">Cancel</button>
+</div>
+</div>
+
+<!-- IMAGE VIEW -->
+<div id="imageModal" class="modal hidden">
+<div class="image-box">
+<img id="popupImg">
 </div>
 </div>
 
@@ -114,42 +187,50 @@ tbody tr{animation:rowIn .45s ease forwards}
 const el=id=>document.getElementById(id);
 let regs=[];
 
+/* TOAST */
 function toast(msg){
   const t=el('toast');
   t.textContent=msg;
   t.classList.remove('hidden');
-  t.style.animation='none';t.offsetHeight;t.style.animation='';
-  setTimeout(()=>t.classList.add('hidden'),2600);
+  setTimeout(()=>t.classList.add('hidden'),2500);
 }
 
-el('loginBtn').onclick=()=>el('loginModal').classList.remove('hidden');
-el('cancelLogin').onclick=()=>el('loginModal').classList.add('hidden');
+/* IMAGE VIEW */
+function openImage(src){
+  el('popupImg').src=src;
+  el('imageModal').classList.remove('hidden');
+}
+el('imageModal').onclick=()=>el('imageModal').classList.add('hidden');
 
-el('doLogin').onclick=async()=>{
-  const user=el('admUser').value;
-  const pass=el('admPass').value;
+/* LOGIN */
+loginBtn.onclick=()=>loginModal.classList.remove('hidden');
+cancelLogin.onclick=()=>loginModal.classList.add('hidden');
+
+doLogin.onclick=async()=>{
   const r=await fetch('/admin/login',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     credentials:'include',
-    body:JSON.stringify({user,pass})
+    body:JSON.stringify({user:admUser.value,pass:admPass.value})
   });
   const d=await r.json();
-  if(d.ok){el('loginModal').classList.add('hidden');load();}
+  if(d.ok){loginModal.classList.add('hidden');load();}
   else toast('Login failed');
 };
 
+/* LOAD DATA */
 async function load(){
   const r=await fetch('/registrations',{credentials:'include'});
   if(r.status===401)return toast('Login required');
   regs=await r.json();
-  render(regs);
+  render();
 }
 
-function render(list){
-  const tb=document.querySelector('#listTable tbody');
+/* RENDER */
+function render(){
+  const tb=listTable.querySelector('tbody');
   tb.innerHTML='';
-  list.forEach(r=>{
+  regs.forEach(r=>{
     tb.innerHTML+=`
 <tr>
 <td>${r.id}</td>
@@ -157,33 +238,42 @@ function render(list){
 <td>${r.playerMobile}</td>
 <td>${r.playerEmail}</td>
 <td>${r.playerRole}</td>
-<td><img class="thumb" src="${r.passport_photo}"></td>
-<td><img class="thumb" src="${r.payment_screenshot}"></td>
-<td>${r.payment_status}</td>
+<td><img class="thumb preview" data-img="${r.passport_photo}" src="${r.passport_photo}"></td>
+<td><img class="thumb preview" data-img="${r.payment_screenshot}" src="${r.payment_screenshot}"></td>
+<td class="${r.payment_status}">${r.payment_status}</td>
 <td class="actions">
-<button onclick="act('/admin/verify/${r.id}')">Verify</button>
-<button onclick="act('/admin/reject/${r.id}')">Reject</button>
-<button onclick="act('/admin/delete/${r.id}')">Delete</button>
+<button class="btn" onclick="verify(${r.id})">Verify</button>
+<button class="ghost" onclick="act('/admin/reject/${r.id}')">Reject</button>
+<button class="ghost" onclick="act('/admin/delete/${r.id}')">Delete</button>
 </td>
 </tr>`;
   });
 }
 
+/* IMAGE CLICK HANDLER (SAFE) */
+document.addEventListener('click',e=>{
+  const img=e.target.closest('.preview');
+  if(img) openImage(img.dataset.img);
+});
+
+/* ACTIONS */
+async function verify(id){
+  await fetch('/admin/verify/'+id,{method:'POST',credentials:'include'});
+  toast('Player verified');
+  load();
+}
 async function act(url){
-  const r=await fetch(url,{method:'POST',credentials:'include'});
-  if(r.ok){
-    document.body.classList.add('pulse');
-    setTimeout(()=>document.body.classList.remove('pulse'),900);
-  }
+  await fetch(url,{method:'POST',credentials:'include'});
   load();
 }
 
-el('exportExcel').onclick=()=>window.location.href='/admin/export';
-el('refresh').onclick=load;
+exportExcel.onclick=()=>location.href='/admin/export';
+refresh.onclick=load;
 
+/* AUTO LOAD */
 fetch('/admin/status',{credentials:'include'})
-.then(r=>r.json())
-.then(d=>{if(d.loggedIn)load();});
+.then(r=>r.json()).then(d=>{if(d.loggedIn)load();});
 </script>
+
 </body>
 </html>
