@@ -10,7 +10,7 @@ const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const cookieParser = require('cookie-parser');
 const cloudinary = require('cloudinary').v2;
-const ExcelJS = require('exceljs'); // ✅ ADDED
+const ExcelJS = require('exceljs');
 const db = require('./db');
 
 const app = express();
@@ -28,7 +28,7 @@ const ADMIN_USER = String(process.env.ADMIN_USER || 'admin');
 const ADMIN_PASS = String(process.env.ADMIN_PASS || 'password');
 const SESSION_MS = 2 * 60 * 60 * 1000;
 
-/* ---------------- MAILER (NON-FATAL) ---------------- */
+/* ---------------- MAILER (OPTIONAL) ---------------- */
 let mailer = null;
 if (process.env.SMTP_USER && process.env.SMTP_PASS) {
   mailer = nodemailer.createTransport({
@@ -40,9 +40,6 @@ if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       pass: process.env.SMTP_PASS
     }
   });
-  console.log('Mailer configured');
-} else {
-  console.log('Mailer disabled');
 }
 
 /* ---------------- EXPRESS ---------------- */
@@ -95,19 +92,17 @@ app.get('/qr', async (req, res) => {
     const upi = process.env.FIXED_UPI;
     const amt = process.env.FIXED_AMOUNT || '499';
     if (!upi) return res.send('/images/qr-default.jpg');
+
     const uri = `upi://pay?pa=${upi}&am=${amt}&cu=INR`;
     const data = await QRCode.toDataURL(uri, { width: 800 });
     res.send(data);
-  } catch (e) {
-    console.error('QR error', e);
+  } catch {
     res.status(500).send('/images/qr-default.jpg');
   }
 });
 
 app.get('/qr.png', async (req, res) => {
-  const upi = process.env.FIXED_UPI;
-  const amt = process.env.FIXED_AMOUNT || '499';
-  const uri = `upi://pay?pa=${upi}&am=${amt}&cu=INR`;
+  const uri = `upi://pay?pa=${process.env.FIXED_UPI}&am=${process.env.FIXED_AMOUNT || '499'}&cu=INR`;
   const buf = await QRCode.toBuffer(uri, { width: 800 });
   res.type('png').send(buf);
 });
@@ -131,13 +126,15 @@ app.post('/save-registration',
   async (req, res) => {
     try {
       const { playerName, playerMobile, playerEmail, playerRole } = req.body;
-      if (!playerName || !playerMobile || !playerEmail || !playerRole)
+      if (!playerName || !playerMobile || !playerEmail || !playerRole) {
         return res.status(400).json({ error: 'missing_fields' });
+      }
 
       const pay = req.files?.payment_screenshot?.[0];
       const pass = req.files?.passport_photo?.[0];
-      if (!pay || !pass)
+      if (!pay || !pass) {
         return res.status(400).json({ error: 'files_required' });
+      }
 
       const paymentUrl = await uploadToCloudinary(pay, 'rpl/payment');
       const passportUrl = await uploadToCloudinary(pass, 'rpl/player');
@@ -155,13 +152,13 @@ app.post('/save-registration',
 
       res.json({ ok: true, id });
     } catch (e) {
-      console.error('SAVE FAILED', e);
+      console.error(e);
       res.status(500).json({ error: 'save_failed' });
     }
   }
 );
 
-/* ---------------- ADMIN AUTH ROUTES ---------------- */
+/* ---------------- ADMIN LOGIN ---------------- */
 app.post('/admin/login', (req, res) => {
   const { user, pass } = req.body || {};
   if (user === ADMIN_USER && pass === ADMIN_PASS) {
@@ -178,37 +175,33 @@ app.post('/admin/logout', adminAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/admin/status', (req, res) => {
-  res.json({ loggedIn: isSessionValid(req.cookies.admin_token) });
-});
-
 /* ---------------- ADMIN DATA ---------------- */
 app.get('/registrations', adminAuth, async (req, res) => {
   res.json(await db.getAllRegistrations());
 });
 
-/* ---------------- EXCEL EXPORT (NEW) ---------------- */
+/* ---------------- EXCEL EXPORT ---------------- */
 app.get('/admin/export', adminAuth, async (req, res) => {
   try {
     const rows = await db.getAllRegistrations();
 
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('RPL Players');
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('RPL Players');
 
-    sheet.columns = [
+    ws.columns = [
       { header: 'ID', key: 'id', width: 8 },
-      { header: 'Player Name', key: 'playerName', width: 25 },
-      { header: 'Mobile', key: 'playerMobile', width: 16 },
+      { header: 'Name', key: 'playerName', width: 25 },
+      { header: 'Mobile', key: 'playerMobile', width: 18 },
       { header: 'Email', key: 'playerEmail', width: 30 },
-      { header: 'Role', key: 'playerRole', width: 18 },
+      { header: 'Role', key: 'playerRole', width: 15 },
       { header: 'Status', key: 'payment_status', width: 15 },
-      { header: 'Player Photo URL', key: 'passport_photo', width: 45 },
-      { header: 'Payment Screenshot URL', key: 'payment_screenshot', width: 45 },
+      { header: 'Player Photo', key: 'passport_photo', width: 45 },
+      { header: 'Payment Screenshot', key: 'payment_screenshot', width: 45 },
       { header: 'Registered At', key: 'created_at', width: 22 }
     ];
 
     rows.forEach(r => {
-      sheet.addRow({
+      ws.addRow({
         ...r,
         created_at: new Date(r.created_at).toLocaleString()
       });
@@ -223,19 +216,17 @@ app.get('/admin/export', adminAuth, async (req, res) => {
       'attachment; filename=RPL_Players.xlsx'
     );
 
-    await workbook.xlsx.write(res);
+    await wb.xlsx.write(res);
     res.end();
-
-  } catch (err) {
-    console.error('Excel export error', err);
+  } catch (e) {
+    console.error('Excel export error', e);
     res.status(500).json({ error: 'export_failed' });
   }
 });
 
 /* ---------------- VERIFY / REJECT / DELETE ---------------- */
 app.post('/admin/verify/:id', adminAuth, async (req, res) => {
-  const id = req.params.id;
-  await db.markPaymentVerified(id);
+  await db.markPaymentVerified(req.params.id);
   res.json({ ok: true });
 });
 
