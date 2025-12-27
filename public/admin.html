@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700;800&display=swap" rel="stylesheet">
 
 <style>
-/* ===== SAME CSS — UNCHANGED ===== */
+/* ===== BASE THEME ===== */
 :root{--bg:#071017;--panel:#0f1620;--muted:#9aa8b2;--accent:#d4af37;--ok:#2ecc71;--err:#ff4757}
 *{box-sizing:border-box}
 body{margin:0;font-family:Inter,system-ui,Arial;background:linear-gradient(180deg,#041018,var(--bg));color:#eef3f7;min-height:100vh}
@@ -29,9 +29,43 @@ th{color:var(--muted)}
 .pending{background:#ffe6e6;color:#852020}
 .verified{background:#2ecc71;color:#022508}
 .rejected{background:#ff4757;color:#fff}
+
+/* ===== MODALS / TOAST ===== */
 .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)}
 .hidden{display:none}
-.toast{position:fixed;right:18px;bottom:18px;background:#000;padding:12px;border-radius:8px}
+.toast{
+  position:fixed;
+  right:18px;
+  bottom:18px;
+  background:rgba(0,0,0,0.6);
+  backdrop-filter:blur(12px);
+  padding:12px 16px;
+  border-radius:10px;
+  animation:toastIn .4s ease forwards;
+}
+
+/* ===== PREMIUM ANIMATIONS ===== */
+@keyframes rowIn{
+  from{opacity:0;transform:translateY(16px) scale(.97)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+tbody tr{animation:rowIn .45s ease forwards}
+
+.btn,.ghost{transition:all .25s ease}
+.btn:hover{box-shadow:0 0 18px rgba(212,175,55,.6);transform:translateY(-1px)}
+.ghost:hover{background:rgba(255,255,255,.06)}
+
+@keyframes toastIn{
+  from{opacity:0;transform:translateX(40px)}
+  to{opacity:1;transform:translateX(0)}
+}
+
+@keyframes successPulse{
+  0%{box-shadow:0 0 0 rgba(46,204,113,.9)}
+  70%{box-shadow:0 0 28px rgba(46,204,113,0)}
+  100%{box-shadow:0 0 0 rgba(46,204,113,0)}
+}
+.pulse{animation:successPulse .9s ease}
 </style>
 </head>
 
@@ -67,10 +101,8 @@ th{color:var(--muted)}
 <div id="loginModal" class="modal hidden">
 <div style="background:#07121a;padding:20px;border-radius:10px">
 <h3>Admin Login</h3>
-<input id="admUser" placeholder="Username">
-<br><br>
-<input id="admPass" type="password" placeholder="Password">
-<br><br>
+<input id="admUser" placeholder="Username"><br><br>
+<input id="admPass" type="password" placeholder="Password"><br><br>
 <button id="doLogin" class="btn">Login</button>
 <button id="cancelLogin" class="ghost">Cancel</button>
 </div>
@@ -79,12 +111,16 @@ th{color:var(--muted)}
 <div id="toast" class="toast hidden"></div>
 
 <script>
-/* ========= FIXED COOKIE-BASED SCRIPT ========= */
-
 const el=id=>document.getElementById(id);
 let regs=[];
 
-function toast(m){el('toast').textContent=m;el('toast').classList.remove('hidden');setTimeout(()=>el('toast').classList.add('hidden'),2500);}
+function toast(msg){
+  const t=el('toast');
+  t.textContent=msg;
+  t.classList.remove('hidden');
+  t.style.animation='none';t.offsetHeight;t.style.animation='';
+  setTimeout(()=>t.classList.add('hidden'),2600);
+}
 
 el('loginBtn').onclick=()=>el('loginModal').classList.remove('hidden');
 el('cancelLogin').onclick=()=>el('loginModal').classList.add('hidden');
@@ -92,7 +128,12 @@ el('cancelLogin').onclick=()=>el('loginModal').classList.add('hidden');
 el('doLogin').onclick=async()=>{
   const user=el('admUser').value;
   const pass=el('admPass').value;
-  const r=await fetch('/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({user,pass})});
+  const r=await fetch('/admin/login',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    credentials:'include',
+    body:JSON.stringify({user,pass})
+  });
   const d=await r.json();
   if(d.ok){el('loginModal').classList.add('hidden');load();}
   else toast('Login failed');
@@ -101,11 +142,13 @@ el('doLogin').onclick=async()=>{
 async function load(){
   const r=await fetch('/registrations',{credentials:'include'});
   if(r.status===401)return toast('Login required');
-  regs=await r.json();render(regs);
+  regs=await r.json();
+  render(regs);
 }
 
 function render(list){
-  const tb=document.querySelector('#listTable tbody');tb.innerHTML='';
+  const tb=document.querySelector('#listTable tbody');
+  tb.innerHTML='';
   list.forEach(r=>{
     tb.innerHTML+=`
 <tr>
@@ -117,7 +160,7 @@ function render(list){
 <td><img class="thumb" src="${r.passport_photo}"></td>
 <td><img class="thumb" src="${r.payment_screenshot}"></td>
 <td>${r.payment_status}</td>
-<td>
+<td class="actions">
 <button onclick="act('/admin/verify/${r.id}')">Verify</button>
 <button onclick="act('/admin/reject/${r.id}')">Reject</button>
 <button onclick="act('/admin/delete/${r.id}')">Delete</button>
@@ -127,14 +170,20 @@ function render(list){
 }
 
 async function act(url){
-  await fetch(url,{method:'POST',credentials:'include'});
+  const r=await fetch(url,{method:'POST',credentials:'include'});
+  if(r.ok){
+    document.body.classList.add('pulse');
+    setTimeout(()=>document.body.classList.remove('pulse'),900);
+  }
   load();
 }
 
 el('exportExcel').onclick=()=>window.location.href='/admin/export';
 el('refresh').onclick=load;
 
-fetch('/admin/status',{credentials:'include'}).then(r=>r.json()).then(d=>{if(d.loggedIn)load();});
+fetch('/admin/status',{credentials:'include'})
+.then(r=>r.json())
+.then(d=>{if(d.loggedIn)load();});
 </script>
 </body>
 </html>
