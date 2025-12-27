@@ -1,4 +1,4 @@
-// server.js — FULL Production Server (Supabase + Cloudinary + Admin + QR + Mail)
+// server.js — FULL Production Server (Supabase + Cloudinary + Admin + QR + Mail + Excel Export)
 require('dotenv').config();
 
 const express = require('express');
@@ -10,6 +10,7 @@ const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const cookieParser = require('cookie-parser');
 const cloudinary = require('cloudinary').v2;
+const ExcelJS = require('exceljs'); // ✅ ADDED
 const db = require('./db');
 
 const app = express();
@@ -129,8 +130,6 @@ app.post('/save-registration',
   ]),
   async (req, res) => {
     try {
-      console.log('--- /save-registration called ---');
-
       const { playerName, playerMobile, playerEmail, playerRole } = req.body;
       if (!playerName || !playerMobile || !playerEmail || !playerRole)
         return res.status(400).json({ error: 'missing_fields' });
@@ -188,24 +187,55 @@ app.get('/registrations', adminAuth, async (req, res) => {
   res.json(await db.getAllRegistrations());
 });
 
+/* ---------------- EXCEL EXPORT (NEW) ---------------- */
+app.get('/admin/export', adminAuth, async (req, res) => {
+  try {
+    const rows = await db.getAllRegistrations();
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('RPL Players');
+
+    sheet.columns = [
+      { header: 'ID', key: 'id', width: 8 },
+      { header: 'Player Name', key: 'playerName', width: 25 },
+      { header: 'Mobile', key: 'playerMobile', width: 16 },
+      { header: 'Email', key: 'playerEmail', width: 30 },
+      { header: 'Role', key: 'playerRole', width: 18 },
+      { header: 'Status', key: 'payment_status', width: 15 },
+      { header: 'Player Photo URL', key: 'passport_photo', width: 45 },
+      { header: 'Payment Screenshot URL', key: 'payment_screenshot', width: 45 },
+      { header: 'Registered At', key: 'created_at', width: 22 }
+    ];
+
+    rows.forEach(r => {
+      sheet.addRow({
+        ...r,
+        created_at: new Date(r.created_at).toLocaleString()
+      });
+    });
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=RPL_Players.xlsx'
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (err) {
+    console.error('Excel export error', err);
+    res.status(500).json({ error: 'export_failed' });
+  }
+});
+
+/* ---------------- VERIFY / REJECT / DELETE ---------------- */
 app.post('/admin/verify/:id', adminAuth, async (req, res) => {
   const id = req.params.id;
   await db.markPaymentVerified(id);
-  const row = await db.getRegistrationById(id);
-
-  if (mailer && row?.playerEmail) {
-    try {
-      await mailer.sendMail({
-        to: row.playerEmail,
-        from: `"RPL" <${process.env.SMTP_USER}>`,
-        subject: 'RPL Registration Verified',
-        text: `Hi ${row.playerName}, your registration is verified.`
-      });
-    } catch (e) {
-      console.warn('Email failed (non-fatal)');
-    }
-  }
-
   res.json({ ok: true });
 });
 
