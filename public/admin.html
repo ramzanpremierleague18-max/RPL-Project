@@ -302,6 +302,14 @@ el('search').addEventListener('input', (e)=>{
   render(regs.filter(r => (r.playerName||'').toLowerCase().includes(q) || (r.playerMobile||'').includes(q) || (r.playerEmail||'').toLowerCase().includes(q) || (r.playerRole||'').toLowerCase().includes(q)));
 });
 
+document.getElementById('exportExcel').addEventListener('click', () => {
+  if (!AUTH) {
+    alert('Please login first');
+    return;
+  }
+  window.location.href = '/admin/export';
+});
+
 /* auto-login if session stored */
 (function init(){
   if(AUTH){
@@ -310,14 +318,6 @@ el('search').addEventListener('input', (e)=>{
   } else {
     // show login prompt on first open? Not automatically — let user click.
   }
-  document.getElementById('exportExcel').addEventListener('click', () => {
-  if (!AUTH) {
-    alert('Please login first');
-    return;
-  }
-  window.location.href = '/admin/export';
-});
-
 })();
 </script>
 </body>
