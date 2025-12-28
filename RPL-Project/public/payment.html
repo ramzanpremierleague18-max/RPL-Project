@@ -94,7 +94,7 @@
         <div class="qr-card">
           <div class="upline">
             <div class="meta">UPI ID</div>
-            <div style="font-weight:900;font-size:18px" id="fixedUpi">alikhann042004-2@oksbi</div>
+            <div style="font-weight:900;font-size:18px" id="fixedUpi">8618999313@ybl</div>
             <div class="meta">Amount to pay</div>
             <div style="font-weight:900;font-size:24px">₹ <span id="amount">499</span></div>
           </div>
@@ -159,7 +159,7 @@
 <script>
   // load details from localStorage (set on register page)
   document.getElementById('fixedUpi').textContent = 'alikhann042004-2@oksbi';
-  document.getElementById('amount').textContent = '499';
+  document.getElementById('amount').textContent = '300 only';
 
   const name = localStorage.getItem('rpl_name') || '';
   const email = localStorage.getItem('rpl_email') || '';
@@ -170,7 +170,7 @@
     img.src = '/images/qr-default.jpg';
     document.getElementById('download').disabled = true;
     try {
-      const res = await fetch(`/qr?upi=${encodeURIComponent(document.getElementById('fixedUpi').textContent)}&amount=499`);
+      const res = await fetch(`/qr?upi=${encodeURIComponent(document.getElementById('fixedUpi').textContent)}&amount=300`);
       if(!res.ok) throw new Error('QR fetch failed '+res.status);
       const data = await res.text();
       if(data && data.startsWith('data:image')) {
@@ -188,7 +188,7 @@
   }
   document.getElementById('generate').addEventListener('click', generateQR);
   document.getElementById('openUpi').addEventListener('click', ()=> {
-    location.href = `upi://pay?pa=${encodeURIComponent(document.getElementById('fixedUpi').textContent)}&am=499&tn=${encodeURIComponent('RPL Registration')}&cu=INR`;
+    location.href = `upi://pay?pa=${encodeURIComponent(document.getElementById('fixedUpi').textContent)}&am=300&tn=${encodeURIComponent('RPL Registration')}&cu=INR`;
   });
   document.getElementById('download').addEventListener('click', ()=>{
     const href = document.getElementById('qrImage').src;
