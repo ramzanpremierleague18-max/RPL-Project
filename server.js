@@ -89,17 +89,20 @@ function adminAuth(req, res, next) {
 /* ---------------- QR ---------------- */
 app.get('/qr', async (req, res) => {
   try {
-    const upi = process.env.FIXED_UPI;
-    const amt = process.env.FIXED_AMOUNT || '499';
-    if (!upi) return res.send('/images/qr-default.jpg');
+    // 🔒 HARD-CODED UPI (Tousif)
+    const upi = 'tousieefullakhan@okicici';
+    const amt = '300';
 
     const uri = `upi://pay?pa=${upi}&am=${amt}&cu=INR`;
     const data = await QRCode.toDataURL(uri, { width: 800 });
+
     res.send(data);
-  } catch {
+  } catch (err) {
+    console.error('QR error:', err);
     res.status(500).send('/images/qr-default.jpg');
   }
 });
+
 
 app.get('/qr.png', async (req, res) => {
   const uri = `upi://pay?pa=${process.env.FIXED_UPI}&am=${process.env.FIXED_AMOUNT || '499'}&cu=INR`;
@@ -125,11 +128,12 @@ app.post('/save-registration',
   ]),
   async (req, res) => {
     try {
-      const { playerName, playerMobile, playerEmail, playerRole } = req.body;
-      if (!playerName || !playerMobile || !playerEmail || !playerRole) {
-        return res.status(400).json({ error: 'missing_fields' });
-      }
+    const { playerName, playerMobile, playerEmail, playerRole } = req.body;
 
+// ❗ Email is OPTIONAL now
+if (!playerName || !playerMobile || !playerRole) {
+  return res.status(400).json({ error: 'missing_fields' });
+}
       const pay = req.files?.payment_screenshot?.[0];
       const pass = req.files?.passport_photo?.[0];
       if (!pay || !pass) {
