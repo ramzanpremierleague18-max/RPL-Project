@@ -1,6 +1,7 @@
 // server.js — FULL Production Server (Supabase + Cloudinary + Admin + QR + Mail + Excel Export)
 require('dotenv').config();
 
+const { Resend } = require('resend');
 const express = require('express');
 const bodyParser = require('body-parser');
 const multer = require('multer');
@@ -16,6 +17,10 @@ const db = require('./db');
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const resend = new Resend(process.env.RESEND_API_KEY);
+if (!process.env.RESEND_API_KEY) {
+  console.warn('⚠️ RESEND_API_KEY is not set');
+}
+
 
 /* ---------------- CLOUDINARY ---------------- */
 cloudinary.config({
@@ -78,7 +83,7 @@ async function sendVerifyEmail(to, name, id) {
   if (!to) return;
 
   await resend.emails.send({
-    from: 'RPL <onboarding@resend.dev>',
+    from: 'RPL <no-reply@resend.dev>',
     to,
     subject: 'RPL Registration Verified ✅',
     html: `
