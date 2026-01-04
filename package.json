@@ -10,6 +10,7 @@
     "@supabase/supabase-js": "^2.87.1",
     "bcrypt": "^6.0.0",
     "body-parser": "^1.20.4",
+    "cat": "^0.2.0",
     "cloudinary": "^2.8.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -19,6 +20,7 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^7.0.11",
     "qrcode": "^1.5.4",
+    "resend": "^6.6.0",
     "sqlite3": "^5.1.7",
     "twilio": "^5.10.7"
   },
