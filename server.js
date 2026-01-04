@@ -83,7 +83,7 @@ async function sendVerifyEmail(to, name, id) {
   if (!to) return;
 
   await resend.emails.send({
-    from: 'RPL <no-reply@resend.dev>',
+    from: 'RPL <no-reply@rplleague.com>',
     to,
     subject: 'RPL Registration Verified ✅',
     html: `
