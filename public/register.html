@@ -74,8 +74,8 @@
             <input id="playerMobile" placeholder="10 digit mobile" required>
           </div>
           <div>
-            <label>Email *</label>
-            <input id="playerEmail" type="email" placeholder="you@example.com" required>
+            <label>Email (optional)</label>
+            <input id="playerEmail" type="email" placeholder="you@example.com">
           </div>
         </div>
 
@@ -107,10 +107,10 @@
     const mobile = document.getElementById('playerMobile').value.trim();
     const email = document.getElementById('playerEmail').value.trim();
     const role = document.getElementById('playerRole').value;
-    if(!name || !mobile || !email || !role){
-      alert('Please fill name, mobile, email and role');
-      return;
-    }
+  if(!name || !mobile || !role){
+  alert('Please fill name, mobile and role');
+  return;
+}
     // save to localStorage for payment page
     localStorage.setItem('rpl_name', name);
     localStorage.setItem('rpl_mobile', mobile);
