@@ -1,42 +1,34 @@
-// server.js - RPL registration server (complete)
+// server.js — FULL Production Server (Supabase + Cloudinary + Admin + QR + Mail + Excel Export)
 require('dotenv').config();
+
 const express = require('express');
 const bodyParser = require('body-parser');
-const multer  = require('multer');
-const path = require('path');
-const fs = require('fs');
+const multer = require('multer');
 const cors = require('cors');
 const QRCode = require('qrcode');
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
+const cookieParser = require('cookie-parser');
+const cloudinary = require('cloudinary').v2;
+const ExcelJS = require('exceljs');
 const db = require('./db');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 
-// single admin account (from .env)
-const ADMIN_USER = process.env.ADMIN_USER || 'admin';
-const ADMIN_PASS = process.env.ADMIN_PASS || 'password';
+/* ---------------- CLOUDINARY ---------------- */
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
-// basic auth middleware (simple)
-function basicAuth(req, res, next) {
-  const auth = req.headers['authorization'];
-  if (!auth) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="Admin Area"');
-    return res.status(401).send('Authentication required');
-  }
-  const m = auth.match(/^Basic\s+(.+)$/i);
-  if (!m) return res.status(401).send('Invalid auth header');
-  const creds = Buffer.from(m[1], 'base64').toString('utf8');
-  const idx = creds.indexOf(':');
-  if (idx === -1) return res.status(401).send('Invalid auth header');
-  const user = creds.slice(0, idx);
-  const pass = creds.slice(idx + 1);
-  if (user === ADMIN_USER && pass === ADMIN_PASS) return next();
-  res.setHeader('WWW-Authenticate', 'Basic realm="Admin Area"');
-  return res.status(403).send('Forbidden');
-}
+/* ---------------- ADMIN CONFIG ---------------- */
+const ADMIN_USER = String(process.env.ADMIN_USER || 'admin');
+const ADMIN_PASS = String(process.env.ADMIN_PASS || 'password');
+const SESSION_MS = 2 * 60 * 60 * 1000;
 
-// Mailer (optional) - use SMTP_* env vars
+/* ---------------- MAILER (OPTIONAL) ---------------- */
 let mailer = null;
 if (process.env.SMTP_USER && process.env.SMTP_PASS) {
   mailer = nodemailer.createTransport({
@@ -48,211 +40,248 @@ if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       pass: process.env.SMTP_PASS
     }
   });
-  console.log('Mailer configured as', process.env.SMTP_USER);
-} else {
-  console.log('Mailer not configured - set SMTP_USER and SMTP_PASS in .env to enable emails.');
 }
 
+/* ---------------- VERIFY EMAIL HELPER ---------------- */
+async function sendVerifyEmail(to, name, id) {
+  if (!mailer || !to) return;
+
+  await mailer.sendMail({
+    from: `"RPL Tournament" <${process.env.SMTP_USER}>`,
+    to,
+    subject: "RPL Registration Verified ✅",
+    html: `
+      <h2>Hello ${name}</h2>
+      <p>Your RPL registration has been <b>VERIFIED</b>.</p>
+      <p><b>Registration ID:</b> ${id}</p>
+      <p>Please be ready for match day.</p>
+      <br>
+      <p>– RPL Admin Team</p>
+    `
+  });
+}
+
+
+/* ---------------- EXPRESS ---------------- */
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(cookieParser());
+app.use(express.static('public'));
 
-// create uploads dir if missing
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
-if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-
-// multer config
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '';
-    const uniq = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const safe = (file.fieldname || 'file').replace(/[^a-z0-9-_]/gi, '') + '-' + uniq;
-    cb(null, safe + ext);
-  }
-});
+/* ---------------- MULTER (MEMORY) ---------------- */
 const upload = multer({
-  storage,
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
-  fileFilter: (req, file, cb) => {
-    if (/image\/|pdf/.test(file.mimetype)) cb(null, true);
-    else cb(new Error('Only images or PDF allowed'));
-  }
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 }
 });
 
-/* ---------- QR endpoints ---------- */
-// data URL (text response) - good for <img src="...">
+/* ---------------- ADMIN SESSIONS ---------------- */
+const sessions = {};
+
+function createSession(user) {
+  const token = crypto.randomBytes(24).toString('hex');
+  sessions[token] = { user, expires: Date.now() + SESSION_MS };
+  return token;
+}
+
+function isSessionValid(token) {
+  return token && sessions[token] && sessions[token].expires > Date.now();
+}
+
+function clearSession(token) {
+  if (token) delete sessions[token];
+}
+
+/* ---------------- ADMIN AUTH ---------------- */
+function adminAuth(req, res, next) {
+  const token = req.cookies?.admin_token;
+  if (isSessionValid(token)) return next();
+
+  const h = req.headers.authorization;
+  if (h?.startsWith('Basic ')) {
+    const [u, p] = Buffer.from(h.split(' ')[1], 'base64').toString().split(':');
+    if (u === ADMIN_USER && p === ADMIN_PASS) return next();
+  }
+
+  return res.status(401).json({ error: 'auth_required' });
+}
+
+/* ---------------- QR ---------------- */
 app.get('/qr', async (req, res) => {
   try {
-    const upi = (req.query.upi || process.env.FIXED_UPI || '').trim();
-    const amount = (req.query.amount || process.env.FIXED_AMOUNT || '499').toString();
-    if (!upi) return res.status(200).send('/images/qr-default.jpg');
-    const uri = `upi://pay?pa=${encodeURIComponent(upi)}&am=${encodeURIComponent(amount)}&tn=${encodeURIComponent('RPL Registration')}&cu=INR`;
-    const dataUrl = await QRCode.toDataURL(uri, { width: 800 });
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    return res.send(dataUrl);
+    // 🔒 HARD-CODED UPI (Tousif)
+    const upi = 'tousieefullakhan@okicici';
+    const amt = '300';
+
+    const uri = `upi://pay?pa=${upi}&am=${amt}&cu=INR`;
+    const data = await QRCode.toDataURL(uri, { width: 800 });
+
+    res.send(data);
   } catch (err) {
-    console.error('QR generation (dataUrl) failed', err);
-    return res.status(500).send('/images/qr-default.jpg');
+    console.error('QR error:', err);
+    res.status(500).send('/images/qr-default.jpg');
   }
 });
 
-// PNG binary
+
 app.get('/qr.png', async (req, res) => {
-  try {
-    const upi = (req.query.upi || process.env.FIXED_UPI || '').trim();
-    const amount = (req.query.amount || process.env.FIXED_AMOUNT || '499').toString();
-    if (!upi) return res.status(400).send('UPI not configured');
-    const uri = `upi://pay?pa=${encodeURIComponent(upi)}&am=${encodeURIComponent(amount)}&tn=${encodeURIComponent('RPL Registration')}&cu=INR`;
-    const buffer = await QRCode.toBuffer(uri, { type: 'png', width: 800 });
-    res.setHeader('Content-Type', 'image/png');
-    res.send(buffer);
-  } catch (err) {
-    console.error('QR generation (png) failed', err);
-    return res.status(500).send('QR generation failed');
+  const uri = `upi://pay?pa=${process.env.FIXED_UPI}&am=${process.env.FIXED_AMOUNT || '499'}&cu=INR`;
+  const buf = await QRCode.toBuffer(uri, { width: 800 });
+  res.type('png').send(buf);
+});
+
+/* ---------------- CLOUDINARY UPLOAD ---------------- */
+function uploadToCloudinary(file, folder) {
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader.upload_stream(
+      { folder, resource_type: 'image' },
+      (err, result) => err ? reject(err) : resolve(result.secure_url)
+    ).end(file.buffer);
+  });
+}
+
+/* ---------------- SAVE REGISTRATION ---------------- */
+app.post('/save-registration',
+  upload.fields([
+    { name: 'payment_screenshot', maxCount: 1 },
+    { name: 'passport_photo', maxCount: 1 }
+  ]),
+  async (req, res) => {
+    try {
+    const { playerName, playerMobile, playerEmail, playerRole } = req.body;
+
+// ❗ Email is OPTIONAL now
+if (!playerName || !playerMobile || !playerRole) {
+  return res.status(400).json({ error: 'missing_fields' });
+}
+      const pay = req.files?.payment_screenshot?.[0];
+      const pass = req.files?.passport_photo?.[0];
+      if (!pay || !pass) {
+        return res.status(400).json({ error: 'files_required' });
+      }
+
+      const paymentUrl = await uploadToCloudinary(pay, 'rpl/payment');
+      const passportUrl = await uploadToCloudinary(pass, 'rpl/player');
+
+      const id = await db.insertRegistration({
+        playerName,
+        playerMobile,
+        playerEmail,
+        playerRole,
+        payment_screenshot: paymentUrl,
+        passport_photo: passportUrl,
+        payment_status: 'pending',
+        created_at: Date.now()
+      });
+
+      res.json({ ok: true, id });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: 'save_failed' });
+    }
   }
-});
+);
 
-/* ---------- Serve uploaded files (admin only) ---------- */
-app.get('/uploads/:fname', basicAuth, (req, res) => {
-  const fname = path.basename(req.params.fname);
-  const full = path.join(UPLOADS_DIR, fname);
-  if (!fs.existsSync(full)) return res.status(404).send('Not found');
-  res.sendFile(full);
-});
-
-/* ---------- Save registration ---------- */
-app.post('/save-registration', upload.fields([
-  { name: 'payment_screenshot', maxCount: 1 },
-  { name: 'passport_photo', maxCount: 1 }
-]), async (req, res) => {
-  try {
-    console.log('--- /save-registration called ---');
-    console.log('body keys:', Object.keys(req.body));
-    console.log('files keys:', Object.keys(req.files || {}));
-
-    const playerName = (req.body.playerName || '').trim();
-    const playerMobile = (req.body.playerMobile || '').trim();
-    const playerEmail = (req.body.playerEmail || '').trim();
-    const playerRole = (req.body.playerRole || '').trim();
-
-    if (!playerName || !playerMobile || !playerEmail || !playerRole) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-    if (!req.files || !req.files.payment_screenshot || !req.files.passport_photo) {
-      return res.status(400).json({ error: 'Both payment_screenshot and passport_photo are required' });
-    }
-
-    const paymentFile = req.files.payment_screenshot[0];
-    const passportFile = req.files.passport_photo[0];
-
-    const rec = {
-      teamName: null,
-      playerName,
-      playerMobile,
-      playerEmail,
-      playerRole,
-      jerseyNumber: null,
-      jerseySize: null,
-      category: null,
-      screenshot: null,
-      aadhaar: null,
-      passport_photo: '/uploads/' + passportFile.filename,
-      payment_screenshot: '/uploads/' + paymentFile.filename,
-      payment_status: 'pending',
-      created_at: Date.now()
-    };
-
-    const id = await db.insertRegistration(rec);
-    console.log('Saved registration id=', id, 'name=', playerName);
-    return res.json({ ok: true, id });
-  } catch (err) {
-    console.error('SAVE REGISTRATION ERROR:', err && (err.stack || err.message || err));
-    if (err && err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'file_too_large' });
-    }
-    return res.status(500).json({ error: 'save_failed', detail: String(err && err.message) });
+/* ---------------- ADMIN LOGIN ---------------- */
+app.post('/admin/login', (req, res) => {
+  const { user, pass } = req.body || {};
+  if (user === ADMIN_USER && pass === ADMIN_PASS) {
+    const token = createSession(user);
+    res.cookie('admin_token', token, { httpOnly: true, maxAge: SESSION_MS });
+    return res.json({ ok: true });
   }
+  res.status(401).json({ error: 'invalid_credentials' });
 });
 
-/* ---------- Admin routes ---------- */
-// list - protected
-app.get('/registrations', basicAuth, async (req, res) => {
+app.post('/admin/logout', adminAuth, (req, res) => {
+  clearSession(req.cookies.admin_token);
+  res.clearCookie('admin_token');
+  res.json({ ok: true });
+});
+
+/* ---------------- ADMIN DATA ---------------- */
+app.get('/registrations', adminAuth, async (req, res) => {
+  res.json(await db.getAllRegistrations());
+});
+
+/* ---------------- EXCEL EXPORT ---------------- */
+app.get('/admin/export', adminAuth, async (req, res) => {
   try {
     const rows = await db.getAllRegistrations();
-    res.json(rows);
-  } catch (err) {
-    console.error('get registrations error', err);
-    res.status(500).json({ error: 'db_failed' });
-  }
-});
 
-// verify - protected; attempt email but never fail verification on SMTP error
-app.post('/admin/verify/:id', basicAuth, async (req, res) => {
-  try {
-    const id = req.params.id;
-    await db.markPaymentVerified(id);
-    const row = await db.getRegistrationById(id);
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('RPL Players');
 
-    if (mailer && row && row.playerEmail) {
-      const mail = {
-        from: `"RPL Management" <${process.env.SMTP_USER}>`,
-        to: row.playerEmail,
-        subject: 'RPL Registration Verified',
-        text: `Hi ${row.playerName},\n\nYour registration for RPL has been VERIFIED. Payment and details confirmed.\n\nRegards,\nRPL Management`
-      };
-      try {
-        await mailer.sendMail(mail);
-        console.log('Email sent to', row.playerEmail);
-        return res.json({ ok: true, email: 'sent' });
-      } catch (mailErr) {
-        console.warn('Email send failed (non-fatal):', mailErr && (mailErr.message || mailErr));
-        return res.json({ ok: true, email: 'failed', error: String(mailErr && mailErr.message) });
-      }
-    }
+    ws.columns = [
+      { header: 'ID', key: 'id', width: 8 },
+      { header: 'Name', key: 'playerName', width: 25 },
+      { header: 'Mobile', key: 'playerMobile', width: 18 },
+      { header: 'Email', key: 'playerEmail', width: 30 },
+      { header: 'Role', key: 'playerRole', width: 15 },
+      { header: 'Status', key: 'payment_status', width: 15 },
+      { header: 'Player Photo', key: 'passport_photo', width: 45 },
+      { header: 'Payment Screenshot', key: 'payment_screenshot', width: 45 },
+      { header: 'Registered At', key: 'created_at', width: 22 }
+    ];
 
-    return res.json({ ok: true, email: 'skipped' });
-  } catch (err) {
-    console.error('verify error', err && (err.stack || err.message || err));
-    return res.status(500).json({ error: 'verify_failed', detail: String(err && err.message) });
-  }
-});
-
-// reject
-app.post('/admin/reject/:id', basicAuth, async (req, res) => {
-  try {
-    await db.markPaymentRejected(req.params.id);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('reject error', err);
-    res.status(500).json({ error: 'reject_failed' });
-  }
-});
-
-// delete (and remove files)
-app.post('/admin/delete/:id', basicAuth, async (req, res) => {
-  try {
-    const id = req.params.id;
-    const row = await db.getRegistrationById(id);
-    if (!row) return res.status(404).json({ error: 'not_found' });
-
-    ['payment_screenshot','passport_photo','screenshot','aadhaar'].forEach(k => {
-      if (row[k]) {
-        const bn = path.basename(row[k]);
-        const fp = path.join(UPLOADS_DIR, bn);
-        try { if (fs.existsSync(fp)) fs.unlinkSync(fp); } catch (e) { console.warn('unlink failed', fp, e); }
-      }
+    rows.forEach(r => {
+      ws.addRow({
+        ...r,
+        created_at: new Date(r.created_at).toLocaleString()
+      });
     });
 
-    await db.deleteRegistration(id);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('delete error', err);
-    res.status(500).json({ error: 'delete_failed' });
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=RPL_Players.xlsx'
+    );
+
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (e) {
+    console.error('Excel export error', e);
+    res.status(500).json({ error: 'export_failed' });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
+/* ---------------- VERIFY / REJECT / DELETE ---------------- */
+app.post('/admin/verify/:id', adminAuth, async (req, res) => {
+  const id = req.params.id;
+
+  const player = await db.getRegistrationById(id);
+  await db.markPaymentVerified(id);
+
+  if (player?.playerEmail) {
+    try {
+      await sendVerifyEmail(
+        player.playerEmail,
+        player.playerName,
+        id
+      );
+    } catch (e) {
+      console.error('Email failed (non-fatal)', e);
+    }
+  }
+
+  res.json({ ok: true });
 });
+
+
+app.post('/admin/reject/:id', adminAuth, async (req, res) => {
+  await db.markPaymentRejected(req.params.id);
+  res.json({ ok: true });
+});
+
+app.post('/admin/delete/:id', adminAuth, async (req, res) => {
+  await db.deleteRegistration(req.params.id);
+  res.json({ ok: true });
+});
+
+/* ---------------- START ---------------- */
+app.listen(PORT, () =>
+  console.log(`Server running on http://localhost:${PORT}`)
+);

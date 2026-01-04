@@ -42,6 +42,26 @@ if (process.env.SMTP_USER && process.env.SMTP_PASS) {
   });
 }
 
+/* ---------------- VERIFY EMAIL HELPER ---------------- */
+async function sendVerifyEmail(to, name, id) {
+  if (!mailer || !to) return;
+
+  await mailer.sendMail({
+    from: `"RPL Tournament" <${process.env.SMTP_USER}>`,
+    to,
+    subject: "RPL Registration Verified ✅",
+    html: `
+      <h2>Hello ${name}</h2>
+      <p>Your RPL registration has been <b>VERIFIED</b>.</p>
+      <p><b>Registration ID:</b> ${id}</p>
+      <p>Please be ready for match day.</p>
+      <br>
+      <p>– RPL Admin Team</p>
+    `
+  });
+}
+
+
 /* ---------------- EXPRESS ---------------- */
 app.use(cors());
 app.use(bodyParser.json());
@@ -230,9 +250,26 @@ app.get('/admin/export', adminAuth, async (req, res) => {
 
 /* ---------------- VERIFY / REJECT / DELETE ---------------- */
 app.post('/admin/verify/:id', adminAuth, async (req, res) => {
-  await db.markPaymentVerified(req.params.id);
+  const id = req.params.id;
+
+  const player = await db.getRegistrationById(id);
+  await db.markPaymentVerified(id);
+
+  if (player?.playerEmail) {
+    try {
+      await sendVerifyEmail(
+        player.playerEmail,
+        player.playerName,
+        id
+      );
+    } catch (e) {
+      console.error('Email failed (non-fatal)', e);
+    }
+  }
+
   res.json({ ok: true });
 });
+
 
 app.post('/admin/reject/:id', adminAuth, async (req, res) => {
   await db.markPaymentRejected(req.params.id);
