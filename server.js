@@ -29,15 +29,28 @@ const ADMIN_PASS = String(process.env.ADMIN_PASS || 'password');
 const SESSION_MS = 2 * 60 * 60 * 1000;
 
 /* ---------------- MAILER (OPTIONAL) ---------------- */
-let mailer = null;
-if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-  mailer = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
+mailer = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT),
+  secure: false, // MUST be false for 587
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  },
+  tls: {
+    rejectUnauthorized: false
+  },
+  connectionTimeout: 60_000, // 60s
+  greetingTimeout: 30_000,
+  socketTimeout: 60_000
+});
+
+if (mailer) {
+  mailer.verify((err, success) => {
+    if (err) {
+      console.error('SMTP verify failed:', err.message);
+    } else {
+      console.log('SMTP server is ready to send emails');
     }
   });
 }
