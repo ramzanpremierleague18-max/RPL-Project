@@ -6,15 +6,16 @@ const bodyParser = require('body-parser');
 const multer = require('multer');
 const cors = require('cors');
 const QRCode = require('qrcode');
-const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const cookieParser = require('cookie-parser');
 const cloudinary = require('cloudinary').v2;
 const ExcelJS = require('exceljs');
 const db = require('./db');
 
+/* ---------------- INIT ---------------- */
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 /* ---------------- CLOUDINARY ---------------- */
 cloudinary.config({
@@ -27,53 +28,6 @@ cloudinary.config({
 const ADMIN_USER = String(process.env.ADMIN_USER || 'admin');
 const ADMIN_PASS = String(process.env.ADMIN_PASS || 'password');
 const SESSION_MS = 2 * 60 * 60 * 1000;
-
-/* ---------------- MAILER (OPTIONAL) ---------------- */
-mailer = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: false, // MUST be false for 587
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
-  },
-  connectionTimeout: 60_000, // 60s
-  greetingTimeout: 30_000,
-  socketTimeout: 60_000
-});
-
-if (mailer) {
-  mailer.verify((err, success) => {
-    if (err) {
-      console.error('SMTP verify failed:', err.message);
-    } else {
-      console.log('SMTP server is ready to send emails');
-    }
-  });
-}
-
-/* ---------------- VERIFY EMAIL HELPER ---------------- */
-async function sendVerifyEmail(to, name, id) {
-  if (!mailer || !to) return;
-
-  await mailer.sendMail({
-    from: `"RPL Tournament" <${process.env.SMTP_USER}>`,
-    to,
-    subject: "RPL Registration Verified ✅",
-    html: `
-      <h2>Hello ${name}</h2>
-      <p>Your RPL registration has been <b>VERIFIED</b>.</p>
-      <p><b>Registration ID:</b> ${id}</p>
-      <p>Please be ready for match day.</p>
-      <br>
-      <p>– RPL Admin Team</p>
-    `
-  });
-}
-
 
 /* ---------------- EXPRESS ---------------- */
 app.use(cors());
@@ -117,6 +71,25 @@ function adminAuth(req, res, next) {
   }
 
   return res.status(401).json({ error: 'auth_required' });
+}
+
+/* ---------------- EMAIL (RESEND) ---------------- */
+async function sendVerifyEmail(to, name, id) {
+  if (!to) return;
+
+  await resend.emails.send({
+    from: 'RPL <onboarding@resend.dev>',
+    to,
+    subject: 'RPL Registration Verified ✅',
+    html: `
+      <h2>Hello ${name}</h2>
+      <p>Your <b>RPL registration</b> has been verified.</p>
+      <p><b>Registration ID:</b> ${id}</p>
+      <p>Be ready for match day!</p>
+      <br/>
+      <p>— RPL Admin Team</p>
+    `
+  });
 }
 
 /* ---------------- QR ---------------- */
