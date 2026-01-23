@@ -96,7 +96,7 @@
             <div class="meta">UPI ID</div>
             <div style="font-weight:900;font-size:18px" id="fixedUpi">tousieefullakhan@okicici</div>
             <div class="meta">Amount to pay</div>
-            <div style="font-weight:900;font-size:24px">₹ <span id="amount">300</span></div>
+            <div style="font-weight:900;font-size:24px">₹ <span id="amount">100</span></div>
           </div>
 
           <div class="qr-box" id="qrArea">
@@ -159,7 +159,7 @@
 <script>
   // load details from localStorage (set on register page)
   document.getElementById('fixedUpi').textContent = 'tousieefullakhan@okicici';
-  document.getElementById('amount').textContent = '300';
+  document.getElementById('amount').textContent = '100';
 
   const name = localStorage.getItem('rpl_name') || '';
   const email = localStorage.getItem('rpl_email') || '';
@@ -170,7 +170,7 @@
     img.src = '/images/qr-default.jpg';
     document.getElementById('download').disabled = true;
     try {
-      const res = await fetch(`/qr?upi=${encodeURIComponent(document.getElementById('fixedUpi').textContent)}&amount=300`);
+      const res = await fetch(`/qr?upi=${encodeURIComponent(document.getElementById('fixedUpi').textContent)}&amount=100`);
       if(!res.ok) throw new Error('QR fetch failed '+res.status);
       const data = await res.text();
       if(data && data.startsWith('data:image')) {
@@ -188,7 +188,7 @@
   }
   document.getElementById('generate').addEventListener('click', generateQR);
   document.getElementById('openUpi').addEventListener('click', ()=> {
-    location.href = `upi://pay?pa=${encodeURIComponent(document.getElementById('fixedUpi').textContent)}&am=300&tn=${encodeURIComponent('RPL Registration')}&cu=INR`;
+    location.href = `upi://pay?pa=${encodeURIComponent(document.getElementById('fixedUpi').textContent)}&am=100&tn=${encodeURIComponent('RPL Registration')}&cu=INR`;
   });
   document.getElementById('download').addEventListener('click', ()=>{
     const href = document.getElementById('qrImage').src;
