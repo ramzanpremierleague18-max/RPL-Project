@@ -102,7 +102,7 @@ app.get('/qr', async (req, res) => {
   try {
     // 🔒 HARD-CODED UPI (Tousif)
     const upi = 'tousieefullakhan@okicici';
-    const amt = '300';
+    const amt = '100';
 
     const uri = `upi://pay?pa=${upi}&am=${amt}&cu=INR`;
     const data = await QRCode.toDataURL(uri, { width: 800 });
